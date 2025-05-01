@@ -1,0 +1,9 @@
+#!/opt/Projects/MagicSmokeBlog/stitch_schemata/.venv/bin/python
+import os
+import sys
+
+sys.path.insert(0, os.path.realpath(os.path.dirname(os.path.realpath(__file__)) + '/..'))
+
+import stitch_schemata
+
+stitch_schemata.main()

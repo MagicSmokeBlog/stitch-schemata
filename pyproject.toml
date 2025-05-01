@@ -1,0 +1,34 @@
+[tool.poetry]
+name = "StichSchemata"
+version = "0.0.0"
+description = "Stitch scanned images of electronic circuits schematics."
+authors = [""]
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/MagicSmokeBlog/stitch-schemata"
+documentation = "https://github.com/MagicSmokeBlog/stitch-schemata"
+keywords = ["Stitch", "Electronic", "Circuits", "Schematics"]
+classifiers = ["Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Multimedia :: Graphics :: Capture :: Scanners",
+    "Topic :: Multimedia :: Graphics :: Graphics Conversion"
+]
+
+[tool.poetry.dependencies]
+python = "^3.13.0"
+cleo = "^2.1.0"
+opencv-python = "^4.11.0.86"
+img2pdf = "^0.6.1"
+pillow = "^11.2.1"
+
+[tool.poetry.group.dev.dependencies]
+coverage = "^7.5.1"
+
+[tool.poetry.scripts]
+stitch-schema = "stitch_schemata:main"
+
+[build-system]
+requires = ["poetry-core"]
