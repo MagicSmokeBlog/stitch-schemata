@@ -37,24 +37,27 @@ class TileFinder:
         Path to the grayscale image of the scanned page.
         """
 
+        self._image: Image = Image.read(self._grayscale_page)
+        """
+        The grayscale image of the scanned page.
+        """
+
     # ------------------------------------------------------------------------------------------------------------------
     def find_tile(self, tile: Tile) -> Tile:
         """
 
         """
-        image = Image.read(self._grayscale_page)
+        res = cv.matchTemplate(self._image.data, tile.image, cv.TM_CCOEFF_NORMED)
 
-        res = cv.matchTemplate(image.data, tile.image, cv.TM_CCOEFF_NORMED)
-
-        _, value, _, location = cv.minMaxLoc(res)
-        self._io.log_verbose(f'Found tile at {location} {value}.')
+        _, match, _, location = cv.minMaxLoc(res)
+        self._io.log_verbose(f'Found tile at {location}, match: {match}.')
 
         return Tile(x=location[0],
                     y=location[1],
-                    match=value,
+                    match=match,
                     width=tile.width,
                     height=tile.height,
-                    image=image.data[location[1]:location[1] + self._config.tile_height,
+                    image=self._image.data[location[1]:location[1] + self._config.tile_height,
                           location[0]:location[0] + self._config.tile_width])
 
     # ------------------------------------------------------------------------------------------------------------------

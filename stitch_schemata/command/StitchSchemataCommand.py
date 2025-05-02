@@ -1,11 +1,14 @@
 import os
+import re
 import tempfile
 from pathlib import Path
+from typing import Dict, Tuple
 
 from cleo.commands.command import Command
 from cleo.helpers import argument, option
 
 from stitch_schemata.helper.Config import Config
+from stitch_schemata.helper.StitchError import StitchError
 from stitch_schemata.io.StitchSchemataIO import StitchSchemataIO
 from stitch_schemata.stitch.Stitch import Stitch
 
@@ -49,8 +52,15 @@ class StitchSchemataCommand(Command):
         option(long_name='tile-iterations-max',
                description='The maximum number of iterations allowed for finding a tile.',
                default=5,
-               flag=False)
-    ]
+               flag=False),
+        option(long_name='quality',
+               description='The quality of the stitched image when saved as jpeg or pdf.',
+               default=90,
+               flag=False),
+        option(long_name='tile-hint',
+               description='The centers of the top and bottom tiles of a scanned image (basename:x,y;x,y).',
+               flag=False,
+               multiple=True)]
     arguments = [argument(name='pages', description='The scanned circuit schema pages.', optional=False, multiple=True)]
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -86,6 +96,24 @@ class StitchSchemataCommand(Command):
                       tile_match_min=float(self.option('tile-match-min')),
                       tile_iterations_max=int(self.option('tile-iterations-max')),
                       tmp_path=tmp_path.absolute(),
-                      output_path=Path(self.option('output')))
+                      output_path=Path(self.option('output')),
+                      quality=int(self.option('quality')),
+                      tile_hints=self._extract_tile_hints())
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def _extract_tile_hints(self) -> Dict[str, Tuple[Tuple[int, int], Tuple[int, int]]]:
+        """
+        Extracts the tile hints from the given options.
+        """
+        title_hints = {}
+        for tile_hint in self.option('tile-hint'):
+            parts = re.match(r'(?P<basename>.+):(?P<top_x>\d+),(?P<top_y>\d+);(?P<bottom_x>\d+),(?P<bottom_y>\d+)',
+                             tile_hint)
+            if parts is None:
+                raise StitchError(f'Invalid tile hint: {tile_hint}')
+            title_hints[parts.group('basename')] = ((parts.group('top_x'), parts.group('top_y')),
+                                                    (parts.group('bottom_x'), parts.group('bottom_y')))
+
+        return title_hints
 
 # ----------------------------------------------------------------------------------------------------------------------

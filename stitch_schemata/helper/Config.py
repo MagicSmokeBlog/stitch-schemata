@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Dict, Tuple
 
 
 @dataclass(frozen=True)
@@ -56,4 +57,10 @@ class Config:
     quality: int = 90
     """
     The quality of the stitched image when saved as jpeg or pdf. 
+    """
+
+    tile_hints: Dict[str,Tuple[Tuple[int,int],Tuple[int,int]]] = None
+    """
+    Manual given hints for finding tiles. A map from basename of scanned images to the centers of the top and bottom 
+    tiles. 
     """

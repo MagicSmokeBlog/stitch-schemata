@@ -91,15 +91,20 @@ class Stitch:
         return metadata
 
     # ------------------------------------------------------------------------------------------------------------------
-    def _pre_stitch_image(self, index: int, pages: List[Path], grayscale_images) -> ScanMetadata:
+    def _pre_stitch_image(self, index: int, pages: List[Path], grayscale_images: List[Path]) -> ScanMetadata:
         """
         Collects metadata for stitching a scanned image.
         """
         angle = 0.0
         iteration = 0
         while True:
-            extractor = TileExtractor(self._io, self._config, grayscale_images[index])
+            extractor = TileExtractor(self._io,
+                                      self._config,
+                                      grayscale_images[index],
+                                      self._config.tile_hints.get(pages[index].name))
             tile_top, tile_bottom = extractor.extract_tiles()
+            self._io.log_verbose(f'Contrast top tile {tile_top.contrast}.')
+            self._io.log_verbose(f'Contrast bottom tile {tile_bottom.contrast}.')
 
             if tile_top.contrast < self._config.tile_contrast_min:
                 raise StitchError(
@@ -131,6 +136,8 @@ class Stitch:
             image = image.grayscale()
             image = image.rotate(angle)
             image.write(grayscale_images[index])
+
+            self._io.log_verbose(f'Rotation {angle}.')
 
             iteration += 1
 
