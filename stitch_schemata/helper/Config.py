@@ -13,6 +13,11 @@ class Config:
     The margin applied when searching for tiles. 
     """
 
+    overlap_min: float = 0.1
+    """
+    The minimum overlap of scanned pages.
+    """
+
     tile_width: int = 200
     """
     The width of a tile.
@@ -21,12 +26,6 @@ class Config:
     tile_height: int = 200
     """
     The height of a tile.
-    """
-
-    tile_fraction: float = 0.4
-    """
-    The default (top or bottom) fraction of the scanned page applied when searching searching for the top and bottom 
-    tiles. 
     """
 
     tile_contrast_min: float = 10.0

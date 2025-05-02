@@ -103,15 +103,6 @@ class Stitch:
                                       grayscale_images[index],
                                       self._config.tile_hints.get(pages[index].name))
             tile_top, tile_bottom = extractor.extract_tiles()
-            self._io.log_verbose(f'Contrast top tile {tile_top.contrast}.')
-            self._io.log_verbose(f'Contrast bottom tile {tile_bottom.contrast}.')
-
-            if tile_top.contrast < self._config.tile_contrast_min:
-                raise StitchError(
-                        f'Unable to find top tile in image {grayscale_images[index]} with sufficient contrast.')
-            if tile_bottom.contrast < self._config.tile_contrast_min:
-                raise StitchError(
-                        f'Unable to find bottom tile int image {grayscale_images[index]} with sufficient contrast.')
 
             finder = TileFinder(self._io, self._config, grayscale_images[index - 1])
             tile_top_match = finder.find_tile(tile_top)

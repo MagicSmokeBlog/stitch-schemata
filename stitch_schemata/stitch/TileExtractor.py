@@ -1,9 +1,11 @@
+import math
 from pathlib import Path
 from typing import Tuple
 
 import cv2 as cv
 
 from stitch_schemata.helper.Config import Config
+from stitch_schemata.helper.StitchError import StitchError
 from stitch_schemata.io.StitchSchemataIO import StitchSchemataIO
 from stitch_schemata.stitch.Image import Image
 from stitch_schemata.stitch.Tile import Tile
@@ -75,9 +77,19 @@ class TileExtractor:
         Extracts the top and bottom tiles in a scanned page.
         """
         if self._tile_hint is None:
-            return self._extract_tiles_auto()
+            tile_top, tile_bottom = self._extract_tiles_auto()
+        else:
+            tile_top, tile_bottom = self._extract_tiles_manual()
 
-        return self._extract_tiles_manual()
+        self._io.log_verbose(f'Top tile: ({tile_top.x},{tile_top.y}), contrast: {tile_top.contrast}.')
+        self._io.log_verbose(f'Bottom tile: ({tile_bottom.x},{tile_bottom.y}), contrast: {tile_bottom.contrast}.')
+        if self._io.is_very_verbose():
+            target_path = self._grayscale_page.with_name(f'{self._grayscale_page.stem}-tile-top.png')
+            cv.imwrite(str(target_path), tile_top.image)
+            target_path = self._grayscale_page.with_name(f'{self._grayscale_page.stem}-tile-bottom.png')
+            cv.imwrite(str(target_path), tile_bottom.image)
+
+        return tile_top, tile_bottom
 
     # ------------------------------------------------------------------------------------------------------------------
     def _extract_tiles_manual(self) -> Tuple[Tile, Tile]:
@@ -146,86 +158,52 @@ class TileExtractor:
         """
         Extracts the top and bottom tiles in a scanned page automatically
         """
-        tile_top = self._extract_tile_top()
-        tile_bottom = self._extract_tile_bottom()
-
-        return tile_top, tile_bottom
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def _extract_tile_top(self) -> Tile:
-        """
-        Extracts the top tile.
-        """
         width, height = self._image.size()
 
-        i = self._config.margin
-        contrast_max = 0.0
-        j_max = 0
-        start = self._config.margin
-        fraction = int(height * self._config.tile_fraction)
-        stop = height // 2
-        contrasts = []
-        for j in range(start, stop):
-            part = self._image.data[j:j + self._config.tile_height, i:i + self._config.tile_width]
-            weight = 1.0 if j <= fraction else (j - fraction) / (fraction - stop)
-            contrast = weight * part.std()
-            if contrast > contrast_max:
-                contrast_max = contrast
-                j_max = j
-            contrasts.append(contrast)
+        min_x = self._config.margin
+        max_x = min(int(self._config.overlap_min * width), width - self._config.margin - 1)
+        bands_x = int(math.ceil((max_x - min_x + 1) / (0.5 * self._config.tile_width)))
+        step_x = int(math.ceil((max_x - min_x + 1) / bands_x))
 
-        tile = self._image.data[j_max:j_max + self._config.tile_height, i:i + self._config.tile_width]
+        min_y = self._config.margin
+        max_y = height - self._config.margin - 1
+        bands_y = int(math.ceil((max_y - min_y + 1) / (0.5 * self._config.tile_height)))
+        step_y = int(math.ceil((max_y - min_y + 1) / bands_y))
 
-        message = f"Top tile: ({i}, {j_max})x({i + self._config.tile_width - 1}, {j_max + self._config.tile_height - 1})."
-        self._io.log_verbose(message)
-        self._io.log_verbose(f'Contrast: {contrast_max}')
-        if self._io.is_very_verbose():
-            target_path = self._grayscale_page.with_name(f'{self._grayscale_page.stem}-tile-top.png')
-            cv.imwrite(str(target_path), tile)
+        tiles = []
+        for x in range(min_x, max_x + 1, step_x):
+            for y in range(min_y, max_y + 1, step_y):
+                data = self._image.data[y:y + self._config.tile_width + 1, x:x + self._config.tile_height + 1]
+                contrast = data.std()
+                if contrast >= self._config.tile_contrast_min:
+                    tile = Tile(x=x, y=y, contrast=contrast, width=width, height=height, image=data)
+                    tiles.append(tile)
 
-        return Tile(x=i,
-                    y=j_max,
-                    contrast=contrast_max,
-                    width=self._config.tile_width,
-                    height=self._config.tile_height,
-                    image=tile)
+        distance_max = math.sqrt((max_x - min_x) ** 2 + (max_y - min_y) ** 2)
+        contrast_max = max([tile.contrast for tile in tiles])
 
-    # ------------------------------------------------------------------------------------------------------------------
-    def _extract_tile_bottom(self) -> Tile:
-        """
-        Extracts the bottom tile.
-        """
-        width, height = self._image.size()
+        n = len(tiles)
+        value_max = 0.0
+        tile1_max: Tile | None = None
+        tile2_max: Tile | None = None
+        for i in range(n):
+            for j in range(i + 1, n):
+                tile1 = tiles[i]
+                tile2 = tiles[j]
+                distance = math.sqrt((tile2.x - tile1.x) ** 2 + (tile2.y - tile1.y) ** 2)
+                if distance > math.sqrt(self._config.tile_width ** 2 + self._config.tile_height ** 2):
+                    value = 0.5 * (tile1.contrast + tile2.contrast) / contrast_max + distance / distance_max
+                    if value > value_max:
+                        value_max = value
+                        tile1_max = tile1
+                        tile2_max = tile2
 
-        i = self._config.margin
-        contrast_max = 0.0
-        j_max = 0
-        start = height - 1 - self._config.margin - self._config.tile_height
-        fraction = height - int(height * self._config.tile_fraction)
-        # stop = height // 2
-        for j in range(start, fraction, -1):
-            part = self._image.data[j:j + self._config.tile_height, i:i + self._config.tile_width]
-            # weight = 1.0 if j >= fraction else (fraction - j) / (stop - fraction)
-            weight = 1.0
-            contrast = weight * part.std()
-            if contrast > contrast_max:
-                contrast_max = contrast
-                j_max = j
+        if tile1_max is None or tile2_max is None:
+            raise StitchError(f'Unable to find tiles in image {self._grayscale_page} with sufficient contrast.')
 
-        tile = self._image.data[j_max:j_max + self._config.tile_height, i:i + self._config.tile_width]
+        if tile1_max.y < tile2_max.y:
+            return tile1_max, tile2_max
 
-        message = f"Bottom tile: ({i}, {j_max})x({i + self._config.tile_width - 1}, {j_max + self._config.tile_height - 1})."
-        self._io.log_verbose(message)
-        self._io.log_verbose(f'Contrast: {contrast_max}')
-        if self._io.is_very_verbose():
-            target_path = self._grayscale_page.with_name(f'{self._grayscale_page.stem}-tile-bottom.png')
-            cv.imwrite(str(target_path), tile)
-
-        return Tile(x=i,
-                    y=j_max,
-                    contrast=contrast_max,
-                    width=self._config.tile_width,
-                    height=self._config.tile_height,
-                    image=tile)
+        return tile2_max, tile1_max
 
 # ----------------------------------------------------------------------------------------------------------------------
