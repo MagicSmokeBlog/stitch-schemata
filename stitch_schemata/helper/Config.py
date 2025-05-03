@@ -15,7 +15,12 @@ class Config:
 
     overlap_min: float = 0.1
     """
-    The minimum overlap of scanned pages.
+    The minimum overlap fraction of scanned pages.
+    """
+
+    vertical_offset_max: int = 50
+    """
+    The maximum vertical offset in pixels of the scanned pages.
     """
 
     tile_width: int = 200

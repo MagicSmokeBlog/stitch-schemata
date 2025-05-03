@@ -163,25 +163,35 @@ class Image:
 
     # ------------------------------------------------------------------------------------------------------------------
     @staticmethod
-    def merge_data(data1: np.ndarray, data2: np.ndarray, offset_x: int, offset_y: int, overlap_x: int) -> np.ndarray:
+    def merge_data(destination: np.ndarray,
+                   source: np.ndarray,
+                   offset_x: int,
+                   offset_y: int,
+                   overlap_x: int) -> np.ndarray:
         """
         Copies one image into another image.
 
-        :param data1: The other image.
-        :param data2: The image to be copied.
-        :param offset_x:
-        :param offset_y:
+        :param destination: The destination image.
+        :param source: The source image to be copied.
+        :param offset_x: The offset along the x-axis where the source image must be copied into the destination image.
+        :param offset_y: The offset along the y-axis where the source image must be copied into the destination image.
+        :param overlap_x: The offset along the x-axis from where the source image must be copied.
         """
-        height1, width1 = data1.shape[:2]
-        height2, width2 = data2.shape[:2]
+        height1, width1 = destination.shape[:2]
+        height2, width2 = source.shape[:2]
 
-        for x2 in range(overlap_x, width2):
-            for y2 in range(height2):
-                x1 = x2 + offset_x
-                y1 = y2 + offset_y
-                if 0 <= x1 < width1 and 0 <= y1 < height1:
-                    data1[y1, x1] = data2[y2, x2]
+        x1_min = max(0, offset_x + overlap_x)
+        x1_max = min(width1, width2 + offset_x)
+        y1_min = max(0, offset_y)
+        y1_max = min(height1, height2 + offset_y)
 
-        return data1
+        y2_min = max(0, -offset_y)
+        y2_max = y2_min + y1_max - y1_min
+        x2_min = max(0, overlap_x)
+        x2_max = min(width2, width2 + offset_x)
+
+        destination[y1_min:y1_max, x1_min:x1_max] = source[y2_min:y2_max, x2_min:x2_max]
+
+        return destination
 
 # ----------------------------------------------------------------------------------------------------------------------

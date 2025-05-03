@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import cv2 as cv
 
 from stitch_schemata.helper.Config import Config
@@ -14,13 +12,13 @@ class TileFinder:
     """
 
     # ------------------------------------------------------------------------------------------------------------------
-    def __init__(self, io: StitchSchemataIO, config: Config, grayscale_page: Path):
+    def __init__(self, io: StitchSchemataIO, config: Config, image: Image):
         """
         Object constructor.
 
         :param io:The Output decorator.
         :param config: The configuration.
-        :param grayscale_page: Path to the grayscale image of the scanned page.
+        :param image: The grayscale image of the scanned page.
         """
         self._io: StitchSchemataIO = io
         """
@@ -32,12 +30,7 @@ class TileFinder:
         The configuration.
         """
 
-        self._grayscale_page: Path = grayscale_page
-        """
-        Path to the grayscale image of the scanned page.
-        """
-
-        self._image: Image = Image.read(self._grayscale_page)
+        self._image: Image = image
         """
         The grayscale image of the scanned page.
         """
@@ -45,19 +38,23 @@ class TileFinder:
     # ------------------------------------------------------------------------------------------------------------------
     def find_tile(self, tile: Tile) -> Tile:
         """
+        Finds the best matching part in the scanned page with a tile.
 
+        :param tile: The tile.
         """
-        res = cv.matchTemplate(self._image.data, tile.image, cv.TM_CCOEFF_NORMED)
-
+        start = max(tile.y - self._config.vertical_offset_max, 0)
+        stop = min(tile.y + tile.image.shape[0] + self._config.vertical_offset_max, self._image.height)
+        image_band = self._image.data[start:stop]
+        res = cv.matchTemplate(image_band, tile.image, cv.TM_CCOEFF_NORMED)
         _, match, _, location = cv.minMaxLoc(res)
         self._io.log_verbose(f'Found tile at {location}, match: {match}.')
 
         return Tile(x=location[0],
-                    y=location[1],
+                    y=location[1] + start,
                     match=match,
                     width=tile.width,
                     height=tile.height,
-                    image=self._image.data[location[1]:location[1] + self._config.tile_height,
-                          location[0]:location[0] + self._config.tile_width])
+                    image=self._image.data[location[1]:location[1] + tile.image.shape[0],
+                          location[0]:location[0] + tile.image.shape[1]])
 
-    # ------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------

@@ -104,7 +104,8 @@ class Stitch:
                                       self._config.tile_hints.get(pages[index].name))
             tile_top, tile_bottom = extractor.extract_tiles()
 
-            finder = TileFinder(self._io, self._config, grayscale_images[index - 1])
+            image: Image = Image.read(grayscale_images[index - 1])
+            finder = TileFinder(self._io, self._config, image)
             tile_top_match = finder.find_tile(tile_top)
             tile_bottom_match = finder.find_tile(tile_bottom)
 
@@ -115,14 +116,14 @@ class Stitch:
                 raise StitchError(
                         f'Unable to find bottom tile from image {grayscale_images[index]} in image {grayscale_images[index - 1]}.')
 
-            dx = (tile_bottom.x - tile_top.x) - (tile_bottom_match.x - tile_top_match.x)
-            dy = (tile_bottom.y - tile_top.y)
-            angle1 = 90.0 - math.degrees(math.atan2(dy, dx))
+            angle_delta = math.atan2(tile_bottom_match.y - tile_top_match.y, tile_bottom_match.x - tile_top_match.x) - \
+                          math.atan2(tile_bottom.y - tile_top.y, tile_bottom.x - tile_top.x)
 
-            if angle1 == 0.0 or iteration == (self._config.tile_iterations_max - 1):
+            if abs(angle_delta) < math.atan2(1.0, float(max(image.size()) // 2)) or \
+                    iteration == (self._config.tile_iterations_max - 1):
                 break
 
-            angle -= angle1
+            angle -= math.degrees(angle_delta)
             image = Image.read(pages[index])
             image = image.grayscale()
             image = image.rotate(angle)
