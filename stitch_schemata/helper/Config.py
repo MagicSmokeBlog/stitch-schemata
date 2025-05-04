@@ -38,7 +38,7 @@ class Config:
     The minimum required contrast for find the top and bottom tiles.
     """
 
-    tile_match_min: float = 0.8
+    tile_match_min: float = 0.7
     """
     The minimum required match for finding a tile.
     """

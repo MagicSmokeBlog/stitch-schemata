@@ -187,12 +187,12 @@ class TileExtractor:
         tile1_max: Tile | None = None
         tile2_max: Tile | None = None
         for i in range(n):
+            tile1 = tiles[i]
             for j in range(i + 1, n):
-                tile1 = tiles[i]
                 tile2 = tiles[j]
                 distance = math.sqrt((tile2.x - tile1.x) ** 2 + (tile2.y - tile1.y) ** 2)
                 if distance > math.sqrt(self._config.tile_width ** 2 + self._config.tile_height ** 2):
-                    value = 0.5 * (tile1.contrast + tile2.contrast) / contrast_max + distance / distance_max
+                    value = (tile1.contrast + tile2.contrast) / contrast_max + distance / distance_max
                     if value > value_max:
                         value_max = value
                         tile1_max = tile1
