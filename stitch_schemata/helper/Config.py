@@ -58,6 +58,11 @@ class Config:
     The path to the stitched output file. 
     """
 
+    crop: bool = True
+    """
+    Whether to crop the image. Only effects to top and bottom part of the stitched image.
+    """
+
     quality: int = 90
     """
     The quality of the stitched image when saved as jpeg or pdf. 

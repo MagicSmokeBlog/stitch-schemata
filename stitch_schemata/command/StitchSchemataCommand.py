@@ -56,6 +56,10 @@ class StitchSchemataCommand(Command):
                       description='The maximum number of iterations allowed for finding a tile.',
                       default=5,
                       flag=False),
+               option(long_name='crop',
+                      description='Whether to crop the image. Only effects to top and bottom part of the stitched image.',
+                      default=1,
+                      flag=False),
                option(long_name='quality',
                       description='The quality of the stitched image when saved as jpeg or pdf.',
                       default=90,
@@ -101,6 +105,7 @@ class StitchSchemataCommand(Command):
                       tile_iterations_max=int(self.option('tile-iterations-max')),
                       tmp_path=tmp_path.absolute(),
                       output_path=Path(self.option('output')),
+                      crop=self.option('crop')=='1',
                       quality=int(self.option('quality')),
                       tile_hints=self._extract_tile_hints())
 

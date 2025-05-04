@@ -53,6 +53,7 @@ class Stitch:
         metadata = self._pre_stitch_images(images)
         self._log_metadata(metadata)
         image = self._stitch_images(metadata)
+        image = self._crop_stitched_image(image, metadata)
         self._save_stitched_image(image)
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -191,6 +192,27 @@ class Stitch:
             stitch_data = Image.merge_data(stitch_data, image.data, offset_x, offset_y, overlap_x)
 
         return Image(stitch_data)
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def _crop_stitched_image(self, image: Image, pages: List[ScanMetadata]) -> Image:
+        """
+        Cops the stitches image if required.
+
+        :param pages: The metadata of the scanned images.
+        :param image: The stitched image.
+        """
+        if not self._config.crop:
+            return image
+
+        start = 0
+        offset_y = 0
+        stop = image.height
+        for page in pages:
+            offset_y += page.translate_y
+            start = max(start, offset_y)
+            stop = min(stop, page.height + offset_y)
+
+        return Image(data=image.data[start:stop])
 
     # ------------------------------------------------------------------------------------------------------------------
     def _save_stitched_image(self, image: Image) -> None:
