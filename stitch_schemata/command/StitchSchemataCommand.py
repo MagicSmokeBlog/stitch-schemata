@@ -7,8 +7,8 @@ from typing import Dict, Tuple
 from cleo.commands.command import Command
 from cleo.helpers import argument, option
 
-from stitch_schemata.helper.Config import Config
-from stitch_schemata.helper.StitchError import StitchError
+from stitch_schemata.stitch.Config import Config
+from stitch_schemata.stitch.StitchError import StitchError
 from stitch_schemata.io.StitchSchemataIO import StitchSchemataIO
 from stitch_schemata.stitch.Stitch import Stitch
 

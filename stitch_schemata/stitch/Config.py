@@ -48,7 +48,7 @@ class Config:
     The maximum number of iterations allowed for finding a tile.
     """
 
-    tmp_path: Path = Path('.')
+    tmp_path: Path = Path('../helper')
     """
     The path to the temp folder. 
     """

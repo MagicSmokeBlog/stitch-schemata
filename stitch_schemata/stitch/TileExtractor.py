@@ -4,8 +4,8 @@ from typing import Tuple
 
 import cv2 as cv
 
-from stitch_schemata.helper.Config import Config
-from stitch_schemata.helper.StitchError import StitchError
+from stitch_schemata.stitch.Config import Config
+from stitch_schemata.stitch.StitchError import StitchError
 from stitch_schemata.io.StitchSchemataIO import StitchSchemataIO
 from stitch_schemata.stitch.Image import Image
 from stitch_schemata.stitch.Tile import Tile
