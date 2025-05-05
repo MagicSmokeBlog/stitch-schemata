@@ -1,10 +1,9 @@
 import math
-import os
 import re
 from pathlib import Path
 from typing import List
 
-import cv2 as cv
+import cv2
 import img2pdf
 import numpy as np
 import PIL
@@ -13,6 +12,7 @@ from cleo.ui.table import Table
 from stitch_schemata.io.StitchSchemataIO import StitchSchemataIO
 from stitch_schemata.stitch.Config import Config
 from stitch_schemata.stitch.Image import Image
+from stitch_schemata.stitch.OrientationDetector import OrientationDetector
 from stitch_schemata.stitch.ScanMetadata import ScanMetadata
 from stitch_schemata.stitch.StitchError import StitchError
 from stitch_schemata.stitch.TileExtractor import TileExtractor
@@ -43,6 +43,16 @@ class Stitch:
         The configuration.
         """
 
+        self._original_images: List[Image] = []
+        """
+        The original scanned images.
+        """
+
+        self._grayscale_images: List[Image] = []
+        """
+        The grayscale images of the scanned pages.
+        """
+
     # ------------------------------------------------------------------------------------------------------------------
     def stitch(self, images: List[Path]) -> None:
         """
@@ -65,34 +75,53 @@ class Stitch:
         """
         self._io.title('Preprocessing Images')
 
-        grayscale_images = []
+        self._original_images = []
+        self._grayscale_images = []
         metadata = []
         for index, path_src in enumerate(paths):
-            path_dest = self._config.tmp_path / f'page-{index}.png'
-
             self._io.log_notice(f'Preprocessing image <fso>{path_src}</fso>.')
 
-            message = f'Converting <fso>{path_src}</fso> to grayscale <fso>{path_dest.relative_to(os.getcwd())}</fso>.'
-            self._io.log_verbose(message)
-
             image = Image.read(path_src)
-            image = image.grayscale()
-            image.write(path_dest)
-
-            grayscale_images.append(path_dest)
+            self._original_images.append(image)
+            self._grayscale_images.append(image.grayscale())
 
             if index == 0:
-                metadata.append(ScanMetadata(path=path_src,
-                                             width=image.width,
-                                             height=image.height))
+                meta = self._pre_stitch_image0(paths[index])
             else:
-                meta = self._pre_stitch_image(index, paths, grayscale_images)
-                metadata.append(meta)
+                meta = self._pre_stitch_image(index, paths)
+            metadata.append(meta)
 
         return metadata
 
     # ------------------------------------------------------------------------------------------------------------------
-    def _pre_stitch_image(self, index: int, pages: List[Path], grayscale_images: List[Path]) -> ScanMetadata:
+    def _pre_stitch_image0(self, path: Path) -> ScanMetadata:
+        """
+        Finds the rotation of the first scanned page.
+        """
+        detector = OrientationDetector(self._grayscale_images[0])
+        angle = detector.detect_orientation()
+
+        if angle is None:
+            self._io.log_verbose(f'Unable to find orientation of image <fso>{path}</fso>')
+
+            return ScanMetadata(path=path,
+                                rotate=0.0,
+                                translate_x=0,
+                                translate_y=0,
+                                width=self._grayscale_images[0].width,
+                                height=self._grayscale_images[0].height)
+
+        self._grayscale_images[0] = self._original_images[0].grayscale().rotate(angle)
+
+        return ScanMetadata(path=path,
+                            rotate=angle,
+                            translate_x=0,
+                            translate_y=0,
+                            width=self._grayscale_images[0].width,
+                            height=self._grayscale_images[0].height)
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def _pre_stitch_image(self, index: int, pages: List[Path]) -> ScanMetadata:
         """
         Collects metadata for stitching a scanned image.
         """
@@ -101,34 +130,29 @@ class Stitch:
         while True:
             extractor = TileExtractor(self._io,
                                       self._config,
-                                      grayscale_images[index],
+                                      pages[index],
+                                      self._grayscale_images[index],
                                       self._config.tile_hints.get(pages[index].name))
             tile_top, tile_bottom = extractor.extract_tiles()
 
-            image: Image = Image.read_grayscale(grayscale_images[index - 1])
-            finder = TileFinder(self._io, self._config, image)
+            finder = TileFinder(self._io, self._config, self._grayscale_images[index - 1])
             tile_top_match = finder.find_tile(tile_top)
             tile_bottom_match = finder.find_tile(tile_bottom)
 
             if tile_top_match.match < self._config.tile_match_min:
-                raise StitchError(
-                        f'Unable to find top tile from image {grayscale_images[index]} in image {grayscale_images[index - 1]}.')
+                raise StitchError(f'Unable to find top tile from image {pages[index]} in image {pages[index - 1]}.')
             if tile_bottom_match.match < self._config.tile_match_min:
-                raise StitchError(
-                        f'Unable to find bottom tile from image {grayscale_images[index]} in image {grayscale_images[index - 1]}.')
+                raise StitchError(f'Unable to find bottom tile from image {pages[index]} in image {pages[index - 1]}.')
 
             angle_delta = math.atan2(tile_bottom_match.y - tile_top_match.y, tile_bottom_match.x - tile_top_match.x) - \
                           math.atan2(tile_bottom.y - tile_top.y, tile_bottom.x - tile_top.x)
 
-            if abs(angle_delta) < math.atan2(1.0, float(max(image.size()) // 2)) or \
+            if abs(angle_delta) < math.atan2(1.0, float(max(self._grayscale_images[index].size()) // 2)) or \
                     iteration == (self._config.tile_iterations_max - 1):
                 break
 
             angle -= math.degrees(angle_delta)
-            image = Image.read(pages[index])
-            image = image.grayscale()
-            image = image.rotate(angle)
-            image.write(grayscale_images[index])
+            self._grayscale_images[index] = self._original_images[index].grayscale().rotate(angle)
 
             self._io.log_verbose(f'Rotation {angle}.')
 
@@ -139,24 +163,24 @@ class Stitch:
                                 rotate=angle,
                                 translate_x=tile_top_match.x - tile_top.x,
                                 translate_y=tile_top_match.y - tile_top.y,
-                                width=extractor.width,
-                                height=extractor.height)
+                                width=self._grayscale_images[index].width,
+                                height=self._grayscale_images[index].height)
 
         raise StitchError(f"Unable to find a tile match in '{pages[index]}'.")
 
     # ------------------------------------------------------------------------------------------------------------------
-    def _stitch_images(self, pages: List[ScanMetadata]) -> Image:
+    def _stitch_images(self, metadata: List[ScanMetadata]) -> Image:
         """
         Stitches scanned images.
 
-        :param pages: The metadata of the scanned images.
+        :param metadata: The metadata of the scanned images.
         """
         self._io.text('')
         self._io.title('Stitching Images')
 
         offset_y = 0
         offset_y0 = 0
-        for page in pages:
+        for page in metadata:
             offset_y += page.translate_y
             if offset_y < 0:
                 offset_y0 = offset_y
@@ -165,7 +189,7 @@ class Stitch:
         total_height = 0
         offset_x = 0
         offset_y = -offset_y0
-        for page in pages:
+        for page in metadata:
             offset_x += page.translate_x
             offset_y += page.translate_y
             total_width = offset_x + page.width
@@ -175,7 +199,7 @@ class Stitch:
 
         offset_x = 0
         offset_y = 0
-        for index, page in enumerate(pages):
+        for index, page in enumerate(metadata):
             self._io.log_notice(f'Processing image <fso>{page.path}</fso>.')
 
             offset_x += page.translate_x
@@ -186,7 +210,7 @@ class Stitch:
             else:
                 overlap_x = self._config.margin + self._config.tile_width // 2
 
-            image = Image.read(page.path)
+            image = self._original_images[index]
             if page.rotate != 0.0:
                 image = image.rotate(page.rotate)
             stitch_data = Image.merge_data(stitch_data, image.data, offset_x, offset_y, overlap_x)
@@ -225,20 +249,20 @@ class Stitch:
         self._io.title('Saving Image')
 
         if re.match(r'.*\.png$', str(self._config.output_path), re.IGNORECASE):
-            image.write(self._config.output_path, [cv.IMWRITE_PNG_COMPRESSION, 9])
+            image.write(self._config.output_path, [cv2.IMWRITE_PNG_COMPRESSION, 9])
 
         elif re.match(r'.*\.je?pg$', str(self._config.output_path), re.IGNORECASE):
-            image.write(self._config.output_path, [cv.IMWRITE_JPEG_QUALITY, self._config.quality])
+            image.write(self._config.output_path, [cv2.IMWRITE_JPEG_QUALITY, self._config.quality])
 
         elif re.match(r'.*\.pdf$', str(self._config.output_path), re.IGNORECASE):
             PIL.Image.MAX_IMAGE_PIXELS = image.width * image.height
 
             if self._config.quality == 100:
                 temp_filename = self._config.tmp_path / 'stitched.png'
-                image.write(temp_filename, [cv.IMWRITE_PNG_COMPRESSION, 9])
+                image.write(temp_filename, [cv2.IMWRITE_PNG_COMPRESSION, 9])
             else:
                 temp_filename = self._config.tmp_path / 'stitched.jpg'
-                image.write(temp_filename, [cv.IMWRITE_JPEG_QUALITY, self._config.quality])
+                image.write(temp_filename, [cv2.IMWRITE_JPEG_QUALITY, self._config.quality])
             with open(str(self._config.output_path), 'wb') as handle:
                 handle.write(img2pdf.convert(temp_filename))
         else:

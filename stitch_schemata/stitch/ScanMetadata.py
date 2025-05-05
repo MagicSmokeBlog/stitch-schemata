@@ -9,32 +9,32 @@ class ScanMetadata:
     """
 
     # ------------------------------------------------------------------------------------------------------------------
-    path: Path = Path()
+    path: Path
     """
     The path to the scanned page.
     """
 
-    rotate: float = 0.0
+    rotate: float
     """
     The angle of rotation in degrees.
     """
 
-    translate_x: int = 0
+    translate_x: int
     """
     The translation along the x-axis.
     """
 
-    translate_y: int = 0
+    translate_y: int
     """
     The translation along the y-axis.
     """
 
-    width: int = 0
+    width: int
     """
     The image width of the scanned page after rotation.
     """
 
-    height: int = 0
+    height: int
     """
     The image height of the scanned page after rotation.
     """

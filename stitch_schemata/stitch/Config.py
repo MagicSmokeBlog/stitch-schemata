@@ -68,7 +68,7 @@ class Config:
     The quality of the stitched image when saved as jpeg or pdf. 
     """
 
-    tile_hints: Dict[str, Tuple[Tuple[int, int], Tuple[int, int]]]
+    tile_hints: Dict[str,Tuple[Tuple[int,int],Tuple[int,int]]]
     """
     Manual given hints for finding tiles. A map from basename of scanned images to the centers of the top and bottom 
     tiles. 

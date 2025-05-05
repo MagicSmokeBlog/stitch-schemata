@@ -2,12 +2,10 @@ import math
 from pathlib import Path
 from typing import Tuple
 
-import cv2 as cv
-
-from stitch_schemata.stitch.Config import Config
-from stitch_schemata.stitch.StitchError import StitchError
 from stitch_schemata.io.StitchSchemataIO import StitchSchemataIO
+from stitch_schemata.stitch.Config import Config
 from stitch_schemata.stitch.Image import Image
+from stitch_schemata.stitch.StitchError import StitchError
 from stitch_schemata.stitch.Tile import Tile
 
 
@@ -20,14 +18,16 @@ class TileExtractor:
     def __init__(self,
                  io: StitchSchemataIO,
                  config: Config,
-                 grayscale_page: Path,
+                 path: Path,
+                 grayscale_image: Image,
                  tile_hint: Tuple[Tuple[int, int], Tuple[int, int]] | None = None):
         """
         Object constructor.
 
         :param io:The Output decorator.
         :param config: The configuration.
-        :param grayscale_page: Path to the grayscale image of the scanned page.
+        :param path: The path to the original scanned page.
+        :param grayscale_image: The grayscale image of the scanned page.
         :param tile_hint: The tile hint for the scanned page.
         """
         self._io: StitchSchemataIO = io
@@ -40,36 +40,20 @@ class TileExtractor:
         The configuration.
         """
 
-        self._grayscale_page: Path = grayscale_page
+        self._path: Path = path
         """
-        Path to the grayscale image of the scanned page.
+        The path to the original scanned page.
         """
 
-        self._image: Image = Image.read_grayscale(self._grayscale_page)
+        self._grayscale_image: Image = grayscale_image
         """
-        The image of the scanned page.
+        The grayscale image of the scanned page.
         """
 
         self._tile_hint: Tuple[Tuple[int, int], Tuple[int, int]] = tile_hint
         """
         The tile hint for the scanned page.
         """
-
-    # ------------------------------------------------------------------------------------------------------------------
-    @property
-    def width(self) -> int:
-        """
-        The width of the scanned page after rotation.
-        """
-        return self._image.width
-
-    # ------------------------------------------------------------------------------------------------------------------
-    @property
-    def height(self) -> int:
-        """
-        The height of the scanned page after rotation.
-        """
-        return self._image.height
 
     # ------------------------------------------------------------------------------------------------------------------
     def extract_tiles(self) -> Tuple[Tile, Tile]:
@@ -83,11 +67,6 @@ class TileExtractor:
 
         self._io.log_verbose(f'Top tile: ({tile_top.x},{tile_top.y}), contrast: {tile_top.contrast}.')
         self._io.log_verbose(f'Bottom tile: ({tile_bottom.x},{tile_bottom.y}), contrast: {tile_bottom.contrast}.')
-        if self._io.is_very_verbose():
-            target_path = self._grayscale_page.with_name(f'{self._grayscale_page.stem}-tile-top.png')
-            cv.imwrite(str(target_path), tile_top.image)
-            target_path = self._grayscale_page.with_name(f'{self._grayscale_page.stem}-tile-bottom.png')
-            cv.imwrite(str(target_path), tile_bottom.image)
 
         return tile_top, tile_bottom
 
@@ -106,7 +85,7 @@ class TileExtractor:
         """
         Extracts the top and bottom tiles in a scanned page give a tile hint.
         """
-        width, height = self._image.size()
+        width, height = self._grayscale_image.size()
         y_lt = int(self._tile_hint[0][1])
         x_lt = int(self._tile_hint[0][0])
         x_rb = x_lt + int(self._config.tile_width)
@@ -117,7 +96,7 @@ class TileExtractor:
         x_rb = min(width - 1, x_rb)
         y_rb = min(height - 1, y_rb)
 
-        tile = self._image.data[y_lt:y_rb + 1, x_lt:x_rb + 1]
+        tile = self._grayscale_image.data[y_lt:y_rb + 1, x_lt:x_rb + 1]
         contrast = tile.std()
 
         return Tile(x=x_lt,
@@ -133,7 +112,7 @@ class TileExtractor:
         """
         Extracts the top and bottom tiles in a scanned page give a tile hint.
         """
-        width, height = self._image.size()
+        width, height = self._grayscale_image.size()
         y_lt = int(self._tile_hint[1][1])
         x_lt = int(self._tile_hint[1][0])
         x_rb = x_lt + int(self._config.tile_width)
@@ -144,11 +123,12 @@ class TileExtractor:
         x_rb = min(width - 1, x_rb)
         y_rb = min(height - 1, y_rb)
 
-        tile = self._image.data[y_lt:y_rb + 1, x_lt:x_rb + 1]
+        tile = self._grayscale_image.data[y_lt:y_rb + 1, x_lt:x_rb + 1]
         contrast = tile.std()
 
         return Tile(x=x_lt,
                     y=y_lt,
+                    match=None,
                     contrast=contrast,
                     width=self._config.tile_width,
                     height=self._config.tile_height,
@@ -159,7 +139,7 @@ class TileExtractor:
         """
         Extracts the top and bottom tiles in a scanned page automatically
         """
-        width, height = self._image.size()
+        width, height = self._grayscale_image.size()
 
         min_x = self._config.margin
         max_x = min(int(self._config.overlap_min * width), width - self._config.margin - 1)
@@ -174,7 +154,7 @@ class TileExtractor:
         tiles = []
         for x in range(min_x, max_x + 1, step_x):
             for y in range(min_y, max_y + 1, step_y):
-                data = self._image.data[y:y + self._config.tile_width + 1, x:x + self._config.tile_height + 1]
+                data = self._grayscale_image.data[y:y + self._config.tile_width + 1, x:x + self._config.tile_height + 1]
                 contrast = data.std()
                 if contrast >= self._config.tile_contrast_min:
                     tile = Tile(x=x, y=y, match=None, contrast=contrast, width=width, height=height, image=data)
@@ -200,7 +180,7 @@ class TileExtractor:
                         tile2_max = tile2
 
         if tile1_max is None or tile2_max is None:
-            raise StitchError(f'Unable to find tiles in image {self._grayscale_page} with sufficient contrast.')
+            raise StitchError(f'Unable to find tiles in image {self._path} with sufficient contrast.')
 
         if tile1_max.y < tile2_max.y:
             return tile1_max, tile2_max

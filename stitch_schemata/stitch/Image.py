@@ -104,7 +104,7 @@ class Image:
     @staticmethod
     def _crop_around_center(data: np.ndarray, width: float, height: float) -> np.ndarray:
         """
-        Given a image, crops it to the given width and height, around it's center point.
+        Given an image, crops it to the given width and height, around it's center point.
         """
         image_size = (data.shape[1], data.shape[0])
         image_center = (int(image_size[0] * 0.5), int(image_size[1] * 0.5))

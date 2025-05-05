@@ -76,7 +76,7 @@ class StitchSchemataCommand(Command):
         Executes the stitch command.
         """
         io = StitchSchemataIO(self._io.input, self._io.output, self._io.error_output)
-        tmp = tempfile.TemporaryDirectory(prefix='stitch-schemata-', dir=os.getcwd(), delete=not io.is_verbose())
+        tmp = tempfile.TemporaryDirectory(prefix='stitch-schemata-', dir=os.getcwd(), delete=not io.is_debug())
         config = self._create_config(Path(tmp.name))
 
         stitch = Stitch(io, config)
