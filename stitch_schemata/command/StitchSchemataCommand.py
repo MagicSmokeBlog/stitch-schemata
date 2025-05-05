@@ -7,10 +7,10 @@ from typing import Dict, Tuple
 from cleo.commands.command import Command
 from cleo.helpers import argument, option
 
-from stitch_schemata.stitch.Config import Config
-from stitch_schemata.stitch.StitchError import StitchError
 from stitch_schemata.io.StitchSchemataIO import StitchSchemataIO
+from stitch_schemata.stitch.Config import Config
 from stitch_schemata.stitch.Stitch import Stitch
+from stitch_schemata.stitch.StitchError import StitchError
 
 
 class StitchSchemataCommand(Command):
@@ -30,7 +30,7 @@ class StitchSchemataCommand(Command):
                       flag=False),
                option(long_name='overlap-min',
                       description='The minimum overlap fraction of scanned pages.',
-                      default=0.1,
+                      default=0.12,
                       flag=False),
                option(long_name='vertical-offset-max',
                       description='The maximum vertical offset in pixels of the scanned pages.',
@@ -42,7 +42,7 @@ class StitchSchemataCommand(Command):
                       flag=False),
                option(long_name='tile-height',
                       description='The height of a tile.',
-                      default=300,
+                      default=400,
                       flag=False),
                option(long_name='tile-contrast-min',
                       description='The minimum required contrast for find the top and bottom tiles.',
@@ -50,7 +50,7 @@ class StitchSchemataCommand(Command):
                       flag=False),
                option(long_name='tile-match-min',
                       description='The minimum required match for finding a tile.',
-                      default=0.7,
+                      default=0.6,
                       flag=False),
                option(long_name='tile-iterations-max',
                       description='The maximum number of iterations allowed for finding a tile.',
@@ -84,7 +84,7 @@ class StitchSchemataCommand(Command):
 
         io.text('')
 
-        tmp.cleanup()
+        # tmp.cleanup()
 
         return 0
 
@@ -105,7 +105,7 @@ class StitchSchemataCommand(Command):
                       tile_iterations_max=int(self.option('tile-iterations-max')),
                       tmp_path=tmp_path.absolute(),
                       output_path=Path(self.option('output')),
-                      crop=self.option('crop')=='1',
+                      crop=self.option('crop') == '1',
                       quality=int(self.option('quality')),
                       tile_hints=self._extract_tile_hints())
 

@@ -1,7 +1,7 @@
 import cv2 as cv
 
-from stitch_schemata.stitch.Config import Config
 from stitch_schemata.io.StitchSchemataIO import StitchSchemataIO
+from stitch_schemata.stitch.Config import Config
 from stitch_schemata.stitch.Image import Image
 from stitch_schemata.stitch.Tile import Tile
 
@@ -43,9 +43,9 @@ class TileFinder:
         :param tile: The tile.
         """
         start = max(tile.y - self._config.vertical_offset_max, 0)
-        stop = min(tile.y + tile.image.shape[0] + self._config.vertical_offset_max, self._image.height)
+        stop = min(tile.y + tile.image.height + self._config.vertical_offset_max, self._image.height)
         image_band = self._image.data[start:stop]
-        res = cv.matchTemplate(image_band, tile.image, cv.TM_CCOEFF_NORMED)
+        res = cv.matchTemplate(image_band, tile.image.data, cv.TM_CCOEFF_NORMED)
         _, match, _, location = cv.minMaxLoc(res)
         self._io.log_verbose(f'Found tile at {location}, match: {match}.')
 
@@ -53,9 +53,7 @@ class TileFinder:
                     y=location[1] + start,
                     match=match,
                     contrast=None,
-                    width=tile.width,
-                    height=tile.height,
-                    image=self._image.data[location[1]:location[1] + tile.image.shape[0],
-                          location[0]:location[0] + tile.image.shape[1]])
+                    image=Image(self._image.data[location[1]:location[1] + tile.image.height,
+                                location[0]:location[0] + tile.image.width]))
 
 # ----------------------------------------------------------------------------------------------------------------------

@@ -15,6 +15,7 @@ from stitch_schemata.stitch.Image import Image
 from stitch_schemata.stitch.OrientationDetector import OrientationDetector
 from stitch_schemata.stitch.ScanMetadata import ScanMetadata
 from stitch_schemata.stitch.StitchError import StitchError
+from stitch_schemata.stitch.Tile import Tile
 from stitch_schemata.stitch.TileExtractor import TileExtractor
 from stitch_schemata.stitch.TileFinder import TileFinder
 
@@ -138,6 +139,10 @@ class Stitch:
             finder = TileFinder(self._io, self._config, self._grayscale_images[index - 1])
             tile_top_match = finder.find_tile(tile_top)
             tile_bottom_match = finder.find_tile(tile_bottom)
+
+            if self._io.is_debug():
+                self.__save_pages_debug(index, iteration, 'src', tile_top, tile_bottom)
+                self.__save_pages_debug(index, iteration, 'dst', tile_top_match, tile_bottom_match)
 
             if tile_top_match.match < self._config.tile_match_min:
                 raise StitchError(f'Unable to find top tile from image {pages[index]} in image {pages[index - 1]}.')
@@ -291,5 +296,53 @@ class Stitch:
         table.set_headers(headers)
         table.set_rows(rows)
         table.render()
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def __save_pages_debug(self, index: int, iteration: int, name: str, tile_top: Tile, tile_bottom: Tile) -> None:
+        """
+        Save pages for debugging purposes.
+
+        :param index: The index of the page.
+        :param iteration: The iteration of fining the titles.
+        :param name: Either 'src' or 'dst'.
+        :param tile_top: The top tile.
+        :param tile_bottom: The bottom tile.
+        """
+        title_color = (0, 0, 255)
+        area_color = (0, 255, 0)
+        width = 2
+
+        if name == 'src':
+            path = self._config.tmp_path / f'page-{index}-iteration-{iteration}-page{index}.png'
+            image = self._grayscale_images[index].data.copy()
+            areas = [((self._config.margin, self._config.margin),
+                      (int(self._config.overlap_min * self._grayscale_images[index].width - 1),
+                       self._grayscale_images[index].height - self._config.margin - 1))]
+        else:
+            path = self._config.tmp_path / f'page-{index}-iteration-{iteration}-page{index - 1}.png'
+            image = self._grayscale_images[index - 1].data.copy()
+            areas = [((0, max(0, tile_top.y - self._config.vertical_offset_max)),
+                      (self._grayscale_images[index - 1].width - 1,
+                       min(self._grayscale_images[index - 1].height - 1,
+                           tile_top.y + tile_top.image.height + self._config.vertical_offset_max - 1))),
+                     ((0, max(0, tile_bottom.y - self._config.vertical_offset_max)),
+                      (self._grayscale_images[index - 1].width - 1,
+                       min(self._grayscale_images[index - 1].height - 1,
+                           tile_bottom.y + tile_bottom.image.height + self._config.vertical_offset_max - 1)))]
+
+        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+        for area in areas:
+            cv2.rectangle(image, area[0], area[1], area_color, width)
+        cv2.rectangle(image,
+                      (tile_top.x, tile_top.y),
+                      (tile_top.x + self._config.tile_width, tile_top.y + self._config.tile_height),
+                      title_color,
+                      width)
+        cv2.rectangle(image,
+                      (tile_bottom.x, tile_bottom.y),
+                      (tile_bottom.x + self._config.tile_width, tile_bottom.y + self._config.tile_height),
+                      title_color,
+                      width)
+        cv2.imwrite(str(path), image)
 
 # ----------------------------------------------------------------------------------------------------------------------

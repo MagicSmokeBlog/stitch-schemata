@@ -96,16 +96,10 @@ class TileExtractor:
         x_rb = min(width - 1, x_rb)
         y_rb = min(height - 1, y_rb)
 
-        tile = self._grayscale_image.data[y_lt:y_rb + 1, x_lt:x_rb + 1]
-        contrast = tile.std()
+        tile = Image(self._grayscale_image.data[y_lt:y_rb + 1, x_lt:x_rb + 1])
+        contrast = tile.data.std()
 
-        return Tile(x=x_lt,
-                    y=y_lt,
-                    match=None,
-                    contrast=contrast,
-                    width=self._config.tile_width,
-                    height=self._config.tile_height,
-                    image=tile)
+        return Tile(x=x_lt, y=y_lt, match=None, contrast=contrast, image=tile)
 
     # ------------------------------------------------------------------------------------------------------------------
     def _extract_tile_manual_bottom(self) -> Tile:
@@ -123,61 +117,60 @@ class TileExtractor:
         x_rb = min(width - 1, x_rb)
         y_rb = min(height - 1, y_rb)
 
-        tile = self._grayscale_image.data[y_lt:y_rb + 1, x_lt:x_rb + 1]
-        contrast = tile.std()
+        tile = Image(self._grayscale_image.data[y_lt:y_rb + 1, x_lt:x_rb + 1])
+        contrast = tile.data.std()
 
-        return Tile(x=x_lt,
-                    y=y_lt,
-                    match=None,
-                    contrast=contrast,
-                    width=self._config.tile_width,
-                    height=self._config.tile_height,
-                    image=tile)
+        return Tile(x=x_lt, y=y_lt, match=None, contrast=contrast, image=tile)
 
     # ------------------------------------------------------------------------------------------------------------------
     def _extract_tiles_auto(self) -> Tuple[Tile, Tile]:
         """
-        Extracts the top and bottom tiles in a scanned page automatically
+        Extracts the top and bottom tiles from a scanned page automatically
         """
         width, height = self._grayscale_image.size()
 
-        min_x = self._config.margin
-        max_x = min(int(self._config.overlap_min * width), width - self._config.margin - 1)
-        bands_x = int(math.ceil((max_x - min_x + 1) / (0.5 * self._config.tile_width)))
-        step_x = int(math.ceil((max_x - min_x + 1) / bands_x))
+        start_x = self._config.margin
+        stop_x = min(int(self._config.overlap_min * width - self._config.tile_width),
+                     width - self._config.tile_width - self._config.margin)
+        iter_x = int(max(1, math.ceil((stop_x - start_x) / (0.5 * self._config.tile_width)) + 1))
+        step_x = 0.0 if iter_x == 1 else (stop_x - start_x) / (iter_x - 1)
 
-        min_y = self._config.margin
-        max_y = height - self._config.margin - 1
-        bands_y = int(math.ceil((max_y - min_y + 1) / (0.5 * self._config.tile_height)))
-        step_y = int(math.ceil((max_y - min_y + 1) / bands_y))
+        start_y = self._config.margin
+        stop_y = height - self._config.margin - self._config.tile_height
+        iter_y = int(max(1, math.ceil((stop_y - start_y) / (0.5 * self._config.tile_height)) + 1))
+        step_y = 0.0 if iter_y == 1 else (stop_y - start_y) / (iter_y - 1)
 
         tiles = []
-        for x in range(min_x, max_x + 1, step_x):
-            for y in range(min_y, max_y + 1, step_y):
-                data = self._grayscale_image.data[y:y + self._config.tile_width + 1, x:x + self._config.tile_height + 1]
-                contrast = data.std()
+        for i in range(iter_x):
+            x = int(start_x + i * step_x)
+            for j in range(iter_y):
+                y = int(start_y + j * step_y)
+                image = Image(self._grayscale_image.data[y:y + self._config.tile_height,
+                              x:x + self._config.tile_width])
+                contrast = image.data.std()
                 if contrast >= self._config.tile_contrast_min:
-                    tile = Tile(x=x, y=y, match=None, contrast=contrast, width=width, height=height, image=data)
+                    tile = Tile(x=x, y=y, match=None, contrast=contrast, image=image)
                     tiles.append(tile)
 
-        distance_max = math.sqrt((max_x - min_x) ** 2 + (max_y - min_y) ** 2)
-        contrast_max = max([tile.contrast for tile in tiles])
-
-        n = len(tiles)
-        value_max = 0.0
         tile1_max: Tile | None = None
         tile2_max: Tile | None = None
-        for i in range(n):
-            tile1 = tiles[i]
-            for j in range(i + 1, n):
-                tile2 = tiles[j]
-                distance = math.sqrt((tile2.x - tile1.x) ** 2 + (tile2.y - tile1.y) ** 2)
-                if distance > math.sqrt(self._config.tile_width ** 2 + self._config.tile_height ** 2):
-                    value = (tile1.contrast + tile2.contrast) / contrast_max + distance / distance_max
-                    if value > value_max:
-                        value_max = value
-                        tile1_max = tile1
-                        tile2_max = tile2
+        n = len(tiles)
+        if n > 0:
+            distance_max = math.sqrt((stop_x - start_x) ** 2 + (stop_y - start_y) ** 2)
+            contrast_max = max([tile.contrast for tile in tiles])
+
+            value_max = 0.0
+            for i in range(n):
+                tile1 = tiles[i]
+                for j in range(i + 1, n):
+                    tile2 = tiles[j]
+                    distance = math.sqrt((tile2.x - tile1.x) ** 2 + (tile2.y - tile1.y) ** 2)
+                    if distance > math.sqrt(self._config.tile_width ** 2 + self._config.tile_height ** 2):
+                        value = (tile1.contrast + tile2.contrast) / contrast_max + distance / distance_max
+                        if value > value_max:
+                            value_max = value
+                            tile1_max = tile1
+                            tile2_max = tile2
 
         if tile1_max is None or tile2_max is None:
             raise StitchError(f'Unable to find tiles in image {self._path} with sufficient contrast.')

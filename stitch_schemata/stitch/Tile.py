@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-import numpy as np
+from stitch_schemata.stitch.Image import Image
 
 
 @dataclass(frozen=True)
@@ -30,17 +30,7 @@ class Tile:
     The contrast of the tile.
     """
 
-    width: int
-    """
-    Width of the tile.
-    """
-
-    height: int
-    """
-    Height of the tile.
-    """
-
-    image: np.ndarray
+    image: Image
     """
     The tile image.
     """
