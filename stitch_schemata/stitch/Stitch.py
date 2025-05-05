@@ -10,11 +10,11 @@ import numpy as np
 import PIL
 from cleo.ui.table import Table
 
-from stitch_schemata.stitch.Config import Config
-from stitch_schemata.stitch.StitchError import StitchError
 from stitch_schemata.io.StitchSchemataIO import StitchSchemataIO
+from stitch_schemata.stitch.Config import Config
 from stitch_schemata.stitch.Image import Image
 from stitch_schemata.stitch.ScanMetadata import ScanMetadata
+from stitch_schemata.stitch.StitchError import StitchError
 from stitch_schemata.stitch.TileExtractor import TileExtractor
 from stitch_schemata.stitch.TileFinder import TileFinder
 
@@ -105,7 +105,7 @@ class Stitch:
                                       self._config.tile_hints.get(pages[index].name))
             tile_top, tile_bottom = extractor.extract_tiles()
 
-            image: Image = Image.read(grayscale_images[index - 1])
+            image: Image = Image.read_grayscale(grayscale_images[index - 1])
             finder = TileFinder(self._io, self._config, image)
             tile_top_match = finder.find_tile(tile_top)
             tile_bottom_match = finder.find_tile(tile_bottom)
@@ -142,7 +142,7 @@ class Stitch:
                                 width=extractor.width,
                                 height=extractor.height)
 
-        raise ValueError('Unable to find a tile match.')
+        raise StitchError(f"Unable to find a tile match in '{pages[index]}'.")
 
     # ------------------------------------------------------------------------------------------------------------------
     def _stitch_images(self, pages: List[ScanMetadata]) -> Image:

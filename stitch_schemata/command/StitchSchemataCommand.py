@@ -58,7 +58,7 @@ class StitchSchemataCommand(Command):
                       flag=False),
                option(long_name='crop',
                       description='Whether to crop the image. Only effects to top and bottom part of the stitched image.',
-                      default=1,
+                      default='1',
                       flag=False),
                option(long_name='quality',
                       description='The quality of the stitched image when saved as jpeg or pdf.',

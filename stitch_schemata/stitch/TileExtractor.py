@@ -45,7 +45,7 @@ class TileExtractor:
         Path to the grayscale image of the scanned page.
         """
 
-        self._image: Image = Image.read(self._grayscale_page)
+        self._image: Image = Image.read_grayscale(self._grayscale_page)
         """
         The image of the scanned page.
         """

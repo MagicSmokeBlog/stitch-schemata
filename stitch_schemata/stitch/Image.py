@@ -2,7 +2,7 @@ import math
 from pathlib import Path
 from typing import Any, Tuple
 
-import cv2 as cv
+import cv2
 import numpy as np
 
 
@@ -53,7 +53,20 @@ class Image:
 
         :param path: The path.
         """
-        data = cv.imread(str(path))
+        data = cv2.imread(str(path))
+        assert data is not None, f"Unable to open image '{path}'."
+
+        return Image(data)
+
+    # ------------------------------------------------------------------------------------------------------------------
+    @staticmethod
+    def read_grayscale(path: Path):
+        """
+        Reads a grayscale image from the given path.
+
+        :param path: The path.
+        """
+        data = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
         assert data is not None, f"Unable to open image '{path}'."
 
         return Image(data)
@@ -67,9 +80,9 @@ class Image:
         :param params:
         """
         if params is None:
-            cv.imwrite(str(path), self._data)
+            cv2.imwrite(str(path), self._data)
         else:
-            cv.imwrite(str(path), self._data, params)
+            cv2.imwrite(str(path), self._data, params)
 
     # ------------------------------------------------------------------------------------------------------------------
     def rotate(self, angle: float):
@@ -81,8 +94,8 @@ class Image:
         width, height = self.size()
         center = (width // 2, height // 2)
 
-        rotation_matrix = cv.getRotationMatrix2D(center, angle, 1.0)
-        data = cv.warpAffine(self._data, rotation_matrix, self._data.shape[1::-1], )
+        rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
+        data = cv2.warpAffine(self._data, rotation_matrix, self._data.shape[1::-1], )
         data = self._crop_around_center(data, *self._largest_rotated_rect(width, height, math.radians(angle)))
 
         return Image(data)
@@ -150,7 +163,7 @@ class Image:
         """
         Returns a grayscale copy of this image.
         """
-        return Image(cv.cvtColor(self._data, cv.COLOR_BGR2GRAY))
+        return Image(cv2.cvtColor(self._data, cv2.COLOR_BGR2GRAY))
 
     # ------------------------------------------------------------------------------------------------------------------
     def size(self) -> Tuple[int, int]:
