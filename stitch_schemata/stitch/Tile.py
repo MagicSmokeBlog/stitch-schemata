@@ -10,37 +10,37 @@ class Tile:
     """
 
     # ------------------------------------------------------------------------------------------------------------------
-    x: int = 0
+    x: int
     """
     Top x-coordinate of the left top of the tile.
     """
 
-    y: int = 0
+    y: int
     """
     Top y-coordinate of the left top of the tile.
     """
 
-    match: float | None = None
+    match: float | None
     """
     The 
     """
 
-    contrast: float | None = None
+    contrast: float | None
     """
     The contrast of the tile.
     """
 
-    width: int = 0
+    width: int
     """
     Width of the tile.
     """
 
-    height: int = 0
+    height: int
     """
     Height of the tile.
     """
 
-    image: np.ndarray | None = None
+    image: np.ndarray
     """
     The tile image.
     """

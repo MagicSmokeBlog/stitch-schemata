@@ -122,6 +122,7 @@ class TileExtractor:
 
         return Tile(x=x_lt,
                     y=y_lt,
+                    match=None,
                     contrast=contrast,
                     width=self._config.tile_width,
                     height=self._config.tile_height,
@@ -176,7 +177,7 @@ class TileExtractor:
                 data = self._image.data[y:y + self._config.tile_width + 1, x:x + self._config.tile_height + 1]
                 contrast = data.std()
                 if contrast >= self._config.tile_contrast_min:
-                    tile = Tile(x=x, y=y, contrast=contrast, width=width, height=height, image=data)
+                    tile = Tile(x=x, y=y, match=None, contrast=contrast, width=width, height=height, image=data)
                     tiles.append(tile)
 
         distance_max = math.sqrt((max_x - min_x) ** 2 + (max_y - min_y) ** 2)
