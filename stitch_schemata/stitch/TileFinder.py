@@ -47,10 +47,11 @@ class TileFinder:
         image_band = self._image.data[start:stop]
         res = cv.matchTemplate(image_band, tile.image.data, cv.TM_CCOEFF_NORMED)
         _, match, _, location = cv.minMaxLoc(res)
+        location = (location[0], location[1] + start)
         self._io.log_verbose(f'Found tile at {location}, match: {match}.')
 
         return Tile(x=location[0],
-                    y=location[1] + start,
+                    y=location[1],
                     match=match,
                     contrast=None,
                     image=Image(self._image.data[location[1]:location[1] + tile.image.height,
