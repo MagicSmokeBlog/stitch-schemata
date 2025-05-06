@@ -30,11 +30,11 @@ class StitchSchemataCommand(Command):
                       flag=False),
                option(long_name='overlap-min',
                       description='The minimum overlap fraction of scanned pages.',
-                      default=0.12,
+                      default=0.10,
                       flag=False),
                option(long_name='vertical-offset-max',
                       description='The maximum vertical offset in pixels of the scanned pages.',
-                      default=50,
+                      default=200,
                       flag=False),
                option(long_name='tile-width',
                       description='The width of a tile.',
@@ -44,9 +44,9 @@ class StitchSchemataCommand(Command):
                       description='The height of a tile.',
                       default=400,
                       flag=False),
-               option(long_name='tile-contrast-min',
-                      description='The minimum required contrast for find the top and bottom tiles.',
-                      default=10.0,
+               option(long_name='tile-shapes-min',
+                      description='The minimum required number of shapes in a tile.',
+                      default=1,
                       flag=False),
                option(long_name='tile-match-min',
                       description='The minimum required match for finding a tile.',
@@ -55,6 +55,10 @@ class StitchSchemataCommand(Command):
                option(long_name='tile-iterations-max',
                       description='The maximum number of iterations allowed for finding a tile.',
                       default=5,
+                      flag=False),
+               option(long_name='tile-kernel-fraction',
+                      description='The fraction of a tile to use for the kernel size for Gaussian blurring.',
+                      default=0.1,
                       flag=False),
                option(long_name='crop',
                       description='Whether to crop the image. Only effects to top and bottom part of the stitched image.',
@@ -84,8 +88,6 @@ class StitchSchemataCommand(Command):
 
         io.text('')
 
-        # tmp.cleanup()
-
         return 0
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -100,9 +102,10 @@ class StitchSchemataCommand(Command):
                       vertical_offset_max=int(self.option('vertical-offset-max')),
                       tile_width=int(self.option('tile-width')),
                       tile_height=int(self.option('tile-height')),
-                      tile_contrast_min=float(self.option('tile-contrast-min')),
+                      tile_shapes_min=int(self.option('tile-shapes-min')),
                       tile_match_min=float(self.option('tile-match-min')),
                       tile_iterations_max=int(self.option('tile-iterations-max')),
+                      tile_kernel_fraction=float(self.option('tile-kernel-fraction')),
                       tmp_path=tmp_path.absolute(),
                       output_path=Path(self.option('output')),
                       crop=self.option('crop') == '1',
