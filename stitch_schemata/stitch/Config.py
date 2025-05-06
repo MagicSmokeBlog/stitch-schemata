@@ -33,9 +33,9 @@ class Config:
     The height of a tile.
     """
 
-    tile_contrast_min: float
+    tile_shapes_min: int
     """
-    The minimum required contrast for find the top and bottom tiles.
+    The minimum required number of shapes for in a tile.
     """
 
     tile_match_min: float
@@ -46,6 +46,11 @@ class Config:
     tile_iterations_max: int
     """
     The maximum number of iterations allowed for finding a tile.
+    """
+
+    tile_kernel_fraction: float
+    """
+    The fraction of a tile to use for the kernel size for Gaussian blurring.
     """
 
     tmp_path: Path

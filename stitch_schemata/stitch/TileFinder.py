@@ -53,7 +53,7 @@ class TileFinder:
         return Tile(x=location[0],
                     y=location[1],
                     match=match,
-                    contrast=None,
+                    shapes=None,
                     image=Image(self._image.data[location[1]:location[1] + tile.image.height,
                                 location[0]:location[0] + tile.image.width]))
 

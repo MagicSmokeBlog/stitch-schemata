@@ -25,9 +25,9 @@ class Tile:
     The 
     """
 
-    contrast: float | None
+    shapes: int | None
     """
-    The contrast of the tile.
+    The number of shapes in this tile.
     """
 
     image: Image

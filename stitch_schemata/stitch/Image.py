@@ -59,19 +59,6 @@ class Image:
         return Image(data)
 
     # ------------------------------------------------------------------------------------------------------------------
-    @staticmethod
-    def read_grayscale(path: Path):
-        """
-        Reads a grayscale image from the given path.
-
-        :param path: The path.
-        """
-        data = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
-        assert data is not None, f"Unable to open image '{path}'."
-
-        return Image(data)
-
-    # ------------------------------------------------------------------------------------------------------------------
     def write(self, path: Path, params: Any = None) -> None:
         """
         Writes the image to the given path.
@@ -206,5 +193,20 @@ class Image:
         destination[y1_min:y1_max, x1_min:x1_max] = source[y2_min:y2_max, x2_min:x2_max]
 
         return destination
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def number_of_shapes(self, kernel_size: Tuple[int, int]) -> int:
+        """
+        Returns our definition of the number of shapes in this image.
+
+        :param kernel_size: The kernel size to use for Gaussian blurring.
+        """
+        data=self._data
+        data = cv2.GaussianBlur(data, kernel_size, cv2.BORDER_DEFAULT)
+        data = cv2.Canny(data, 50, 100, 3)
+        data = cv2.dilate(data, (1, 1), iterations=0)
+        (cnt, hierarchy) = cv2.findContours(data, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+
+        return len(cnt)
 
 # ----------------------------------------------------------------------------------------------------------------------

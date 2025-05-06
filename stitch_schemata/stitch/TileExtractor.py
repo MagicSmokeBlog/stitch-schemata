@@ -2,6 +2,8 @@ import math
 from pathlib import Path
 from typing import Tuple
 
+import numpy as np
+
 from stitch_schemata.io.StitchSchemataIO import StitchSchemataIO
 from stitch_schemata.stitch.Config import Config
 from stitch_schemata.stitch.Image import Image
@@ -65,8 +67,8 @@ class TileExtractor:
         else:
             tile_top, tile_bottom = self._extract_tiles_manual()
 
-        self._io.log_verbose(f'Top tile: ({tile_top.x},{tile_top.y}), contrast: {tile_top.contrast}.')
-        self._io.log_verbose(f'Bottom tile: ({tile_bottom.x},{tile_bottom.y}), contrast: {tile_bottom.contrast}.')
+        self._io.log_verbose(f'Top tile: ({tile_top.x},{tile_top.y}), # shapes: {tile_top.shapes}.')
+        self._io.log_verbose(f'Bottom tile: ({tile_bottom.x},{tile_bottom.y}), # shapes: {tile_bottom.shapes}.')
 
         return tile_top, tile_bottom
 
@@ -85,6 +87,9 @@ class TileExtractor:
         """
         Extracts the top and bottom tiles in a scanned page give a tile hint.
         """
+        kernel_size = (math.ceil(self._config.tile_kernel_fraction * self._config.tile_width) // 2 * 2 + 1,
+                       math.ceil(self._config.tile_kernel_fraction * self._config.tile_height) // 2 * 2 + 1)
+
         width, height = self._grayscale_image.size()
         y_lt = int(self._tile_hint[0][1])
         x_lt = int(self._tile_hint[0][0])
@@ -97,15 +102,17 @@ class TileExtractor:
         y_rb = min(height - 1, y_rb)
 
         tile = Image(self._grayscale_image.data[y_lt:y_rb + 1, x_lt:x_rb + 1])
-        contrast = tile.data.std()
 
-        return Tile(x=x_lt, y=y_lt, match=None, contrast=contrast, image=tile)
+        return Tile(x=x_lt, y=y_lt, match=None, shapes=tile.number_of_shapes(kernel_size), image=tile)
 
     # ------------------------------------------------------------------------------------------------------------------
     def _extract_tile_manual_bottom(self) -> Tile:
         """
         Extracts the top and bottom tiles in a scanned page give a tile hint.
         """
+        kernel_size = (math.ceil(self._config.tile_kernel_fraction * self._config.tile_width) // 2 * 2 + 1,
+                       math.ceil(self._config.tile_kernel_fraction * self._config.tile_height) // 2 * 2 + 1)
+
         width, height = self._grayscale_image.size()
         y_lt = int(self._tile_hint[1][1])
         x_lt = int(self._tile_hint[1][0])
@@ -118,9 +125,8 @@ class TileExtractor:
         y_rb = min(height - 1, y_rb)
 
         tile = Image(self._grayscale_image.data[y_lt:y_rb + 1, x_lt:x_rb + 1])
-        contrast = tile.data.std()
 
-        return Tile(x=x_lt, y=y_lt, match=None, contrast=contrast, image=tile)
+        return Tile(x=x_lt, y=y_lt, match=None, shapes=tile.number_of_shapes(kernel_size), image=tile)
 
     # ------------------------------------------------------------------------------------------------------------------
     def _extract_tiles_auto(self) -> Tuple[Tile, Tile]:
@@ -140,6 +146,9 @@ class TileExtractor:
         iter_y = int(max(1, math.ceil((stop_y - start_y) / (0.5 * self._config.tile_height)) + 1))
         step_y = 0.0 if iter_y == 1 else (stop_y - start_y) / (iter_y - 1)
 
+        kernel_size = (math.ceil(self._config.tile_kernel_fraction * self._config.tile_width) // 2 * 2 + 1,
+                       math.ceil(self._config.tile_kernel_fraction * self._config.tile_height) // 2 * 2 + 1)
+
         tiles = []
         for i in range(iter_x):
             x = int(start_x + i * step_x)
@@ -147,9 +156,9 @@ class TileExtractor:
                 y = int(start_y + j * step_y)
                 image = Image(self._grayscale_image.data[y:y + self._config.tile_height,
                               x:x + self._config.tile_width])
-                contrast = image.data.std()
-                if contrast >= self._config.tile_contrast_min:
-                    tile = Tile(x=x, y=y, match=None, contrast=contrast, image=image)
+                number_of_shapes = image.number_of_shapes(kernel_size)
+                if number_of_shapes >= self._config.tile_shapes_min:
+                    tile = Tile(x=x, y=y, match=None, shapes=number_of_shapes, image=image)
                     tiles.append(tile)
 
         tile1_max: Tile | None = None
@@ -157,7 +166,7 @@ class TileExtractor:
         n = len(tiles)
         if n > 0:
             distance_max = math.sqrt((stop_x - start_x) ** 2 + (stop_y - start_y) ** 2)
-            contrast_max = max([tile.contrast for tile in tiles])
+            shapes_avg = float(np.average([tile.shapes for tile in tiles]))
 
             value_max = 0.0
             for i in range(n):
@@ -166,14 +175,14 @@ class TileExtractor:
                     tile2 = tiles[j]
                     distance = math.sqrt((tile2.x - tile1.x) ** 2 + (tile2.y - tile1.y) ** 2)
                     if distance > math.sqrt(self._config.tile_width ** 2 + self._config.tile_height ** 2):
-                        value = (tile1.contrast + tile2.contrast) / contrast_max + distance / distance_max
+                        value = (tile1.shapes + tile2.shapes) / shapes_avg + distance / distance_max
                         if value > value_max:
                             value_max = value
                             tile1_max = tile1
                             tile2_max = tile2
 
         if tile1_max is None or tile2_max is None:
-            raise StitchError(f'Unable to find tiles in image {self._path} with sufficient contrast.')
+            raise StitchError(f'Unable to find tiles in image {self._path} with sufficient shapes.')
 
         if tile1_max.y < tile2_max.y:
             return tile1_max, tile2_max
