@@ -65,6 +65,8 @@ class Stitch:
         self._log_metadata(metadata)
         image = self._stitch_images(metadata)
         image = self._crop_stitched_image(image, metadata)
+        if self._io.is_debug():
+            image = self._debug_mark_stitches(metadata, image)
         self._save_stitched_image(image)
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -146,9 +148,9 @@ class Stitch:
             tile_bottom_match = finder.find_tile(tile_bottom)
 
             if self._io.is_debug():
-                self.__save_pages_debug_extract(index, iteration, tile_top, tile_bottom)
-                self.__save_pages_debug_matched(index, iteration, tile_top, tile_bottom, tile_top_match,
-                                                tile_bottom_match)
+                self._debug_save_page_extract(index, iteration, tile_top, tile_bottom)
+                self._debug_save_page_matched(index, iteration, tile_top, tile_bottom, tile_top_match,
+                                              tile_bottom_match)
 
             if tile_top_match.match < self._config.tile_match_min:
                 raise StitchError(f'Unable to find top tile from image {pages[index]} in image {pages[index - 1]}.')
@@ -297,7 +299,7 @@ class Stitch:
         table.render()
 
     # ------------------------------------------------------------------------------------------------------------------
-    def __save_pages_debug_extract(self, index: int, iteration: int, tile_top: Tile, tile_bottom: Tile) -> None:
+    def _debug_save_page_extract(self, index: int, iteration: int, tile_top: Tile, tile_bottom: Tile) -> None:
         """
         Saves a scanned pages with extracted tiles for debugging purposes.
 
@@ -333,13 +335,13 @@ class Stitch:
         cv2.imwrite(str(path), image)
 
     # ------------------------------------------------------------------------------------------------------------------
-    def __save_pages_debug_matched(self,
-                                   index: int,
-                                   iteration: int,
-                                   tile_top: Tile,
-                                   tile_bottom: Tile,
-                                   tile_top_match: Tile,
-                                   tile_bottom_match: Tile) -> None:
+    def _debug_save_page_matched(self,
+                                 index: int,
+                                 iteration: int,
+                                 tile_top: Tile,
+                                 tile_bottom: Tile,
+                                 tile_top_match: Tile,
+                                 tile_bottom_match: Tile) -> None:
         """
         Saves scanned page with matched tile for debugging purposes.
 
@@ -381,5 +383,29 @@ class Stitch:
                       title_color,
                       width)
         cv2.imwrite(str(path), image)
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def _debug_mark_stitches(self, metadata: List[ScanMetadata], image: Image) -> Image:
+        """
+        Adds markers at the stitches in the stitched image.
+
+        :param metadata: The metadata of the scanned pages.
+        :param image: The final stitched image.
+        """
+        marker_color = (0, 0, 255)
+        alpha = 0.5
+        height = image.height
+        data = image.data
+        overlay = data.copy()
+        overlap_x = self._config.margin + self._config.tile_width // 2
+
+        offset = 0
+        for page in metadata[1:]:
+            offset += page.translate_x
+            start = (offset + overlap_x - 1, 0)
+            end = (offset + overlap_x, height - 1)
+            cv2.rectangle(overlay, start, end, marker_color, thickness=1)
+
+        return Image(cv2.addWeighted(overlay, alpha, data, 1.0 - alpha, 0.0))
 
 # ----------------------------------------------------------------------------------------------------------------------
