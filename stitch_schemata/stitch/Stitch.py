@@ -127,8 +127,13 @@ class Stitch:
         Collects metadata for stitching a scanned image.
         """
         angle = 0.0
-        iteration = 0
-        while True:
+        angle_delta = 0.0
+        tile_top = None
+        tile_top_match = None
+        for iteration in range(self._config.tile_iterations_max):
+            angle -= angle_delta
+            self._grayscale_images[index] = self._original_images[index].grayscale().rotate(angle)
+
             extractor = TileExtractor(self._io,
                                       self._config,
                                       pages[index],
@@ -152,17 +157,12 @@ class Stitch:
 
             angle_delta = math.atan2(tile_bottom_match.y - tile_top_match.y, tile_bottom_match.x - tile_top_match.x) - \
                           math.atan2(tile_bottom.y - tile_top.y, tile_bottom.x - tile_top.x)
+            angle_delta = math.degrees(angle_delta)
 
-            if abs(angle_delta) < math.atan2(1.0, float(max(self._grayscale_images[index].size()) // 2)) or \
-                    iteration == (self._config.tile_iterations_max - 1):
+            if not self._original_images[index].rotation_has_effect(angle_delta):
                 break
 
-            angle -= math.degrees(angle_delta)
-            self._grayscale_images[index] = self._original_images[index].grayscale().rotate(angle)
-
             self._io.log_verbose(f'Rotation {angle}.')
-
-            iteration += 1
 
         if tile_top and tile_top_match:
             return ScanMetadata(path=pages[index],
@@ -216,9 +216,7 @@ class Stitch:
             else:
                 overlap_x = self._config.margin + self._config.tile_width // 2
 
-            image = self._original_images[index]
-            if page.rotate != 0.0:
-                image = image.rotate(page.rotate)
+            image = self._original_images[index].rotate(page.rotate)
             stitch_data = Image.merge_data(stitch_data, image.data, offset_x, offset_y, overlap_x)
 
         return Image(stitch_data)

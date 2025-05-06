@@ -78,14 +78,26 @@ class Image:
 
         :param angle: The angle in degrees.
         """
+        if not self.rotation_has_effect(angle):
+            return self
+
         width, height = self.size()
         center = (width // 2, height // 2)
 
         rotation_matrix = cv2.getRotationMatrix2D(center, angle, 1.0)
-        data = cv2.warpAffine(self._data, rotation_matrix, self._data.shape[1::-1], )
+        data = cv2.warpAffine(self._data, rotation_matrix, self._data.shape[1::-1])
         data = self._crop_around_center(data, *self._largest_rotated_rect(width, height, math.radians(angle)))
 
         return Image(data)
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def rotation_has_effect(self, angle: float) -> bool:
+        """
+        Returns whether a given angle of rotation has an effect.
+
+        :param angle: The angle in degrees.
+        """
+        return abs(angle) >= math.degrees(math.atan2(1.0, float(max(self.size()) // 2)))
 
     # ------------------------------------------------------------------------------------------------------------------
     @staticmethod
@@ -201,7 +213,7 @@ class Image:
 
         :param kernel_size: The kernel size to use for Gaussian blurring.
         """
-        data=self._data
+        data = self._data
         data = cv2.GaussianBlur(data, kernel_size, cv2.BORDER_DEFAULT)
         data = cv2.Canny(data, 50, 100, 3)
         data = cv2.dilate(data, (1, 1), iterations=0)
