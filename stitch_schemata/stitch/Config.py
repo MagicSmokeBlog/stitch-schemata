@@ -53,6 +53,11 @@ class Config:
     The fraction of a tile to use for the kernel size for Gaussian blurring.
     """
 
+    dpi: int
+    """
+    The resolution of the scanned images in DPI (Dots Per Inch). 
+    """
+
     tmp_path: Path
     """
     The path to the temp folder. 

@@ -60,6 +60,10 @@ class StitchSchemataCommand(Command):
                       description='The fraction of a tile to use for the kernel size for Gaussian blurring.',
                       default=0.1,
                       flag=False),
+               option(long_name='dpi',
+                      description='The resolution of the scanned images in DPI.',
+                      default=600,
+                      flag=False),
                option(long_name='crop',
                       description='Whether to crop the image. Only effects to top and bottom part of the stitched image.',
                       default='1',
@@ -83,8 +87,8 @@ class StitchSchemataCommand(Command):
         tmp = tempfile.TemporaryDirectory(prefix='stitch-schemata-', dir=os.getcwd(), delete=not io.is_debug())
         config = self._create_config(Path(tmp.name))
 
-        stitch = Stitch(io, config)
-        stitch.stitch([Path(path) for path in self.argument('pages')])
+        stitch = Stitch(io, config, [Path(path) for path in self.argument('pages')])
+        stitch.stitch()
 
         io.text('')
 
@@ -106,6 +110,7 @@ class StitchSchemataCommand(Command):
                       tile_match_min=float(self.option('tile-match-min')),
                       tile_iterations_max=int(self.option('tile-iterations-max')),
                       tile_kernel_fraction=float(self.option('tile-kernel-fraction')),
+                      dpi=int(self.option('dpi')),
                       tmp_path=tmp_path.absolute(),
                       output_path=Path(self.option('output')),
                       crop=self.option('crop') == '1',

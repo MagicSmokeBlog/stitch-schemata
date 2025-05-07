@@ -8,6 +8,7 @@ import img2pdf
 import numpy as np
 import PIL
 from cleo.ui.table import Table
+from PIL import Image as PilImage
 
 from stitch_schemata.io.StitchSchemataIO import StitchSchemataIO
 from stitch_schemata.stitch.Config import Config
@@ -26,14 +27,14 @@ class Stitch:
     """
 
     # ------------------------------------------------------------------------------------------------------------------
-    def __init__(self, io: StitchSchemataIO, config: Config):
+    def __init__(self, io: StitchSchemataIO, config: Config, paths: List[Path]):
         """
         Object constructor.
 
         :param io:The Output decorator.
         :param config: The configuration.
+        :param paths: The paths to the scanned images.
         """
-
         self._io: StitchSchemataIO = io
         """
         The Output decorator.
@@ -42,6 +43,16 @@ class Stitch:
         self._config: Config = config
         """
         The configuration.
+        """
+
+        self._paths: List[Path] = paths
+        """
+        The paths to the scanned images.
+        """
+
+        self._metadata: List[ScanMetadata] = []
+        """
+        The metadata of the scanned images.
         """
 
         self._original_images: List[Image] = []
@@ -54,34 +65,34 @@ class Stitch:
         The grayscale images of the scanned pages.
         """
 
+        self._stitched_image: Image | None = None
+        """
+        The stitched image.
+        """
+
     # ------------------------------------------------------------------------------------------------------------------
-    def stitch(self, images: List[Path]) -> None:
+    def stitch(self) -> None:
         """
         Stitch scanned images.
-
-        :param images: The scanned images.
         """
-        metadata = self._pre_stitch_images(images)
-        self._log_metadata(metadata)
-        image = self._stitch_images(metadata)
-        image = self._crop_stitched_image(image, metadata)
-        if self._io.is_debug():
-            image = self._debug_mark_stitches(metadata, image)
-        self._save_stitched_image(image)
+        self._pre_stitch_images()
+        self._log_metadata()
+        self._stitch_images()
+        self._crop_stitched_image()
+        self._debug_mark_stitches()
+        self._save_stitched_image()
 
     # ------------------------------------------------------------------------------------------------------------------
-    def _pre_stitch_images(self, paths: List[Path]) -> List[ScanMetadata]:
+    def _pre_stitch_images(self) -> None:
         """
-        Collects metadata for stitching a scanned images.
-
-        :param paths: The paths to the scanned images.
+        Collects metadata for stitching scanned images.
         """
         self._io.title('Preprocessing Images')
 
         self._original_images = []
         self._grayscale_images = []
-        metadata = []
-        for index, path_src in enumerate(paths):
+        self._metadata = []
+        for index, path_src in enumerate(self._paths):
             self._io.log_notice(f'Preprocessing image <fso>{path_src}</fso>.')
 
             image = Image.read(path_src)
@@ -89,25 +100,23 @@ class Stitch:
             self._grayscale_images.append(image.grayscale())
 
             if index == 0:
-                meta = self._pre_stitch_image0(paths[index])
+                meta = self._pre_stitch_image0()
             else:
-                meta = self._pre_stitch_image(index, paths)
-            metadata.append(meta)
-
-        return metadata
+                meta = self._pre_stitch_image(index)
+            self._metadata.append(meta)
 
     # ------------------------------------------------------------------------------------------------------------------
-    def _pre_stitch_image0(self, path: Path) -> ScanMetadata:
+    def _pre_stitch_image0(self) -> ScanMetadata:
         """
-        Finds the rotation of the first scanned page.
+        Finds the rotation of the first scanned image.
         """
         detector = OrientationDetector(self._grayscale_images[0])
         angle = detector.detect_orientation()
 
         if angle is None:
-            self._io.log_verbose(f'Unable to find orientation of image <fso>{path}</fso>')
+            self._io.log_verbose(f'Unable to find orientation of image <fso>{self._paths[0]}</fso>.')
 
-            return ScanMetadata(path=path,
+            return ScanMetadata(path=self._paths[0],
                                 rotate=0.0,
                                 translate_x=0,
                                 translate_y=0,
@@ -116,7 +125,7 @@ class Stitch:
 
         self._grayscale_images[0] = self._original_images[0].grayscale().rotate(angle)
 
-        return ScanMetadata(path=path,
+        return ScanMetadata(path=self._paths[0],
                             rotate=angle,
                             translate_x=0,
                             translate_y=0,
@@ -124,9 +133,11 @@ class Stitch:
                             height=self._grayscale_images[0].height)
 
     # ------------------------------------------------------------------------------------------------------------------
-    def _pre_stitch_image(self, index: int, pages: List[Path]) -> ScanMetadata:
+    def _pre_stitch_image(self, index: int) -> ScanMetadata:
         """
         Collects metadata for stitching a scanned image.
+
+        :param index: The index of the scanned image to stitch.
         """
         angle = 0.0
         angle_delta = 0.0
@@ -138,9 +149,9 @@ class Stitch:
 
             extractor = TileExtractor(self._io,
                                       self._config,
-                                      pages[index],
+                                      self._paths[index],
                                       self._grayscale_images[index],
-                                      self._config.tile_hints.get(pages[index].name))
+                                      self._config.tile_hints.get(self._paths[index].name))
             tile_top, tile_bottom = extractor.extract_tiles()
 
             finder = TileFinder(self._io, self._config, self._grayscale_images[index - 1])
@@ -153,9 +164,11 @@ class Stitch:
                                               tile_bottom_match)
 
             if tile_top_match.match < self._config.tile_match_min:
-                raise StitchError(f'Unable to find top tile from image {pages[index]} in image {pages[index - 1]}.')
+                raise StitchError(
+                        f'Unable to find top tile from image {self._paths[index]} in image {self._paths[index - 1]}.')
             if tile_bottom_match.match < self._config.tile_match_min:
-                raise StitchError(f'Unable to find bottom tile from image {pages[index]} in image {pages[index - 1]}.')
+                raise StitchError(
+                        f'Unable to find bottom tile from image {self._paths[index]} in image {self._paths[index - 1]}.')
 
             angle_delta = math.atan2(tile_bottom_match.y - tile_top_match.y, tile_bottom_match.x - tile_top_match.x) - \
                           math.atan2(tile_bottom.y - tile_top.y, tile_bottom.x - tile_top.x)
@@ -167,28 +180,26 @@ class Stitch:
             self._io.log_verbose(f'Rotation {angle}.')
 
         if tile_top and tile_top_match:
-            return ScanMetadata(path=pages[index],
+            return ScanMetadata(path=self._paths[index],
                                 rotate=angle,
                                 translate_x=tile_top_match.x - tile_top.x,
                                 translate_y=tile_top_match.y - tile_top.y,
                                 width=self._grayscale_images[index].width,
                                 height=self._grayscale_images[index].height)
 
-        raise StitchError(f"Unable to find a tile match in '{pages[index]}'.")
+        raise StitchError(f"Unable to find a tile match in '{self._paths[index]}'.")
 
     # ------------------------------------------------------------------------------------------------------------------
-    def _stitch_images(self, metadata: List[ScanMetadata]) -> Image:
+    def _stitch_images(self) -> None:
         """
         Stitches scanned images.
-
-        :param metadata: The metadata of the scanned images.
         """
         self._io.text('')
         self._io.title('Stitching Images')
 
         offset_y = 0
         offset_y0 = 0
-        for page in metadata:
+        for page in self._metadata:
             offset_y += page.translate_y
             if offset_y < 0:
                 offset_y0 = offset_y
@@ -197,7 +208,7 @@ class Stitch:
         total_height = 0
         offset_x = 0
         offset_y = -offset_y0
-        for page in metadata:
+        for page in self._metadata:
             offset_x += page.translate_x
             offset_y += page.translate_y
             total_width = offset_x + page.width
@@ -207,7 +218,7 @@ class Stitch:
 
         offset_x = 0
         offset_y = 0
-        for index, page in enumerate(metadata):
+        for index, page in enumerate(self._metadata):
             self._io.log_notice(f'Processing image <fso>{page.path}</fso>.')
 
             offset_x += page.translate_x
@@ -221,73 +232,69 @@ class Stitch:
             image = self._original_images[index].rotate(page.rotate)
             stitch_data = Image.merge_data(stitch_data, image.data, offset_x, offset_y, overlap_x)
 
-        return Image(stitch_data)
+        self._stitched_image = Image(stitch_data)
 
     # ------------------------------------------------------------------------------------------------------------------
-    def _crop_stitched_image(self, image: Image, pages: List[ScanMetadata]) -> Image:
+    def _crop_stitched_image(self) -> None:
         """
-        Cops the stitches image if required.
-
-        :param pages: The metadata of the scanned images.
-        :param image: The stitched image.
+        Crops the stitches image if required.
         """
         if not self._config.crop:
-            return image
+            return
 
         start = 0
         offset_y = 0
-        stop = image.height
-        for page in pages:
+        stop = self._stitched_image.height
+        for page in self._metadata:
             offset_y += page.translate_y
             start = max(start, offset_y)
             stop = min(stop, page.height + offset_y)
 
-        return Image(data=image.data[start:stop])
+        self._stitched_image = Image(data=self._stitched_image.data[start:stop])
 
     # ------------------------------------------------------------------------------------------------------------------
-    def _save_stitched_image(self, image: Image) -> None:
+    def _save_stitched_image(self) -> None:
         """
         Saves the stitched image.
-
-        :param image: The stitched image.
         """
         self._io.text('')
         self._io.title('Saving Image')
 
         if re.match(r'.*\.png$', str(self._config.output_path), re.IGNORECASE):
-            image.write(self._config.output_path, [cv2.IMWRITE_PNG_COMPRESSION, 9])
+            self._stitched_image.write(self._config.output_path, [cv2.IMWRITE_PNG_COMPRESSION, 9])
 
         elif re.match(r'.*\.je?pg$', str(self._config.output_path), re.IGNORECASE):
-            image.write(self._config.output_path, [cv2.IMWRITE_JPEG_QUALITY, self._config.quality])
+            self._stitched_image.write(self._config.output_path, [cv2.IMWRITE_JPEG_QUALITY, self._config.quality])
 
         elif re.match(r'.*\.pdf$', str(self._config.output_path), re.IGNORECASE):
-            PIL.Image.MAX_IMAGE_PIXELS = image.width * image.height
+            PIL.Image.MAX_IMAGE_PIXELS = self._stitched_image.width * self._stitched_image.height
 
             if self._config.quality == 100:
                 temp_filename = self._config.tmp_path / 'stitched.png'
-                image.write(temp_filename, [cv2.IMWRITE_PNG_COMPRESSION, 9])
+                self._stitched_image.write(temp_filename, [cv2.IMWRITE_PNG_COMPRESSION, 9])
             else:
                 temp_filename = self._config.tmp_path / 'stitched.jpg'
-                image.write(temp_filename, [cv2.IMWRITE_JPEG_QUALITY, self._config.quality])
+                self._stitched_image.write(temp_filename, [cv2.IMWRITE_JPEG_QUALITY, self._config.quality])
             with open(str(self._config.output_path), 'wb') as handle:
-                handle.write(img2pdf.convert(temp_filename))
+                dpi = self._config.dpi
+                handle.write(img2pdf.convert(temp_filename,
+                                             pdfa=self._extract_icc_profile(),
+                                             layout_fun=img2pdf.get_fixed_dpi_layout_fun((dpi, dpi))))
         else:
             raise StitchError(f"Unable to save stitched image as '{self._config.output_path}'.")
 
         self._io.text(f'Saved stitched image as <fso>{self._config.output_path}</fso>.')
 
     # ------------------------------------------------------------------------------------------------------------------
-    def _log_metadata(self, pages: List[ScanMetadata]):
+    def _log_metadata(self):
         """
-        Log the metadata is nice table.
-
-        :param pages: The metadata of the scanned images.
+        Logs the metadata of the scanned images in nice table.
         """
         table = Table(self._io)
 
         headers = ['file', 'rotation', 'translate x', 'translate y']
         rows = []
-        for page in pages:
+        for page in self._metadata:
             rows.append([str(page.path),
                          f'{page.rotate:.4f}',
                          str(page.translate_x),
@@ -385,27 +392,42 @@ class Stitch:
         cv2.imwrite(str(path), image)
 
     # ------------------------------------------------------------------------------------------------------------------
-    def _debug_mark_stitches(self, metadata: List[ScanMetadata], image: Image) -> Image:
+    def _extract_icc_profile(self) -> str:
+        """
+        Extracts the color profile from the scanned images.
+        """
+        icc = PilImage.open(self._paths[0]).info.get('icc_profile')
+        if icc is not None:
+            path = self._config.tmp_path / 'color-profile.icc'
+            with open('cp.icc', 'wb') as handle:
+                handle.write(icc)
+        else:
+            path = Path(__file__).resolve().parent.parent / 'data/sRGB2014.icc'
+
+        return str(path)
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def _debug_mark_stitches(self) -> None:
         """
         Adds markers at the stitches in the stitched image.
-
-        :param metadata: The metadata of the scanned pages.
-        :param image: The final stitched image.
         """
+        if not self._io.is_debug():
+            return
+
         marker_color = (0, 0, 255)
         alpha = 0.5
-        height = image.height
-        data = image.data
+        height = self._stitched_image.height
+        data = self._stitched_image.data
         overlay = data.copy()
         overlap_x = self._config.margin + self._config.tile_width // 2
 
         offset = 0
-        for page in metadata[1:]:
+        for page in self._metadata[1:]:
             offset += page.translate_x
             start = (offset + overlap_x - 1, 0)
             end = (offset + overlap_x, height - 1)
             cv2.rectangle(overlay, start, end, marker_color, thickness=1)
 
-        return Image(cv2.addWeighted(overlay, alpha, data, 1.0 - alpha, 0.0))
+        self._stitched_image = Image(cv2.addWeighted(overlay, alpha, data, 1.0 - alpha, 0.0))
 
 # ----------------------------------------------------------------------------------------------------------------------
