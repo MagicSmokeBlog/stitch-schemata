@@ -116,8 +116,16 @@ class Stitch:
         if angle is None:
             self._io.log_verbose(f'Unable to find orientation of image <fso>{self._paths[0]}</fso>.')
 
-            return ScanMetadata(path=self._paths[0],
-                                rotate=0.0,
+            return ScanMetadata(rotate=0.0,
+                                translate_x=0,
+                                translate_y=0,
+                                width=self._grayscale_images[0].width,
+                                height=self._grayscale_images[0].height)
+
+        if abs(angle) > self._config.rotation_max:
+            self._io.log_verbose(f'Ignoring found rotation offset of {angle:.4f} of image <fso>{self._paths[0]}</fso>.')
+
+            return ScanMetadata(rotate=0.0,
                                 translate_x=0,
                                 translate_y=0,
                                 width=self._grayscale_images[0].width,
@@ -125,8 +133,7 @@ class Stitch:
 
         self._grayscale_images[0] = self._original_images[0].grayscale().rotate(angle)
 
-        return ScanMetadata(path=self._paths[0],
-                            rotate=angle,
+        return ScanMetadata(rotate=angle,
                             translate_x=0,
                             translate_y=0,
                             width=self._grayscale_images[0].width,
@@ -145,6 +152,11 @@ class Stitch:
         tile_top_match = None
         for iteration in range(self._config.tile_iterations_max):
             angle -= angle_delta
+
+            if angle > self._config.rotation_max:
+                raise StitchError(f'Found rotation offset {angle:.4f} of image <fso>{self._paths[index]}</fso> '
+                                  f'exceeds maximum rotation angle of {self._config.rotation_max}.')
+
             self._grayscale_images[index] = self._original_images[index].grayscale().rotate(angle)
 
             extractor = TileExtractor(self._io,
@@ -164,11 +176,11 @@ class Stitch:
                                               tile_bottom_match)
 
             if tile_top_match.match < self._config.tile_match_min:
-                raise StitchError(
-                        f'Unable to find top tile from image {self._paths[index]} in image {self._paths[index - 1]}.')
+                raise StitchError(f'Unable to find top tile from image {self._paths[index]} '
+                                  f'in image {self._paths[index - 1]}.')
             if tile_bottom_match.match < self._config.tile_match_min:
-                raise StitchError(
-                        f'Unable to find bottom tile from image {self._paths[index]} in image {self._paths[index - 1]}.')
+                raise StitchError(f'Unable to find bottom tile from image {self._paths[index]} '
+                                  f'in image {self._paths[index - 1]}.')
 
             angle_delta = math.atan2(tile_bottom_match.y - tile_top_match.y, tile_bottom_match.x - tile_top_match.x) - \
                           math.atan2(tile_bottom.y - tile_top.y, tile_bottom.x - tile_top.x)
@@ -180,8 +192,7 @@ class Stitch:
             self._io.log_verbose(f'Rotation {angle}.')
 
         if tile_top and tile_top_match:
-            return ScanMetadata(path=self._paths[index],
-                                rotate=angle,
+            return ScanMetadata(rotate=angle,
                                 translate_x=tile_top_match.x - tile_top.x,
                                 translate_y=tile_top_match.y - tile_top.y,
                                 width=self._grayscale_images[index].width,
@@ -219,7 +230,7 @@ class Stitch:
         offset_x = 0
         offset_y = 0
         for index, page in enumerate(self._metadata):
-            self._io.log_notice(f'Processing image <fso>{page.path}</fso>.')
+            self._io.log_notice(f'Processing image <fso>{self._paths[index]}</fso>.')
 
             offset_x += page.translate_x
             offset_y += page.translate_y
@@ -294,8 +305,9 @@ class Stitch:
 
         headers = ['file', 'rotation', 'translate x', 'translate y']
         rows = []
-        for page in self._metadata:
-            rows.append([str(page.path),
+
+        for index, page in enumerate(self._metadata):
+            rows.append([str(self._paths[index]),
                          f'{page.rotate:.4f}',
                          str(page.translate_x),
                          str(page.translate_y)])

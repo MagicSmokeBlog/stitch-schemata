@@ -11,6 +11,7 @@ class OrientationDetector:
     Class for detecting the orientation, i.e., the rotation, of an image.
     """
 
+    # ------------------------------------------------------------------------------------------------------------------
     def __init__(self, grayscale_image: Image):
         """
         Object constructor.

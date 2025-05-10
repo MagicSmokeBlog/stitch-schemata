@@ -9,11 +9,6 @@ class ScanMetadata:
     """
 
     # ------------------------------------------------------------------------------------------------------------------
-    path: Path
-    """
-    The path to the scanned page.
-    """
-
     rotate: float
     """
     The angle of rotation in degrees.
@@ -31,12 +26,12 @@ class ScanMetadata:
 
     width: int
     """
-    The image width of the scanned page after rotation.
+    The image width of the scanned page after rotation and cropping.
     """
 
     height: int
     """
-    The image height of the scanned page after rotation.
+    The image height of the scanned page after rotation and cropping.
     """
 
 # ----------------------------------------------------------------------------------------------------------------------

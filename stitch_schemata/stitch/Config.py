@@ -23,6 +23,11 @@ class Config:
     The maximum vertical offset in pixels of the scanned pages.
     """
 
+    rotation_max: float
+    """
+    The maximum rotation offset in degrees of the scanned pages.
+    """
+
     tile_width: int
     """
     The width of a tile.
