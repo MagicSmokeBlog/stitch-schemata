@@ -2,6 +2,7 @@ from cleo.application import Application
 from cleo.io.io import IO
 from cleo.io.outputs.output import Verbosity
 
+from stitch_schemata.command.CombineCommand import CombineCommand
 from stitch_schemata.command.StitchSchemataCommand import StitchSchemataCommand
 from stitch_schemata.io.StitchSchemataIO import StitchSchemataIO
 
@@ -18,6 +19,7 @@ class StitchSchemataApplication(Application):
         """
         Application.__init__(self, 'stitch-schemata', '0.0.0')
 
+        self.add(CombineCommand())
         self.add(StitchSchemataCommand())
 
     # ------------------------------------------------------------------------------------------------------------------

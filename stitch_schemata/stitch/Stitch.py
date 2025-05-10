@@ -87,6 +87,7 @@ class Stitch:
         """
         Collects metadata for stitching scanned images.
         """
+        self._io.text('')
         self._io.title('Preprocessing Images')
 
         self._original_images = []

@@ -15,7 +15,7 @@ from stitch_schemata.stitch.StitchError import StitchError
 
 class StitchSchemataCommand(Command):
     """
-    The stratum command: combination of constants, loader, and wrapper commands.
+    The stitch command.
     """
     name = 'stitch'
     description = 'Stitches scanned circuit schema pages'
