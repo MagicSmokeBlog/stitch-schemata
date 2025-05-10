@@ -20,8 +20,9 @@ classifiers = ["Development Status :: 5 - Production/Stable",
 [tool.poetry.dependencies]
 python = "^3.13.0"
 cleo = "^2.1.0"
-opencv-python = "^4.11.0.86"
 img2pdf = "^0.6.1"
+opencv-python = "^4.11.0.86"
+pikepdf = "^9.7.0"
 pillow = "^11.2.1"
 
 [tool.poetry.group.dev.dependencies]
@@ -32,3 +33,9 @@ stitch-schema = "stitch_schemata:main"
 
 [build-system]
 requires = ["poetry-core"]
+
+[tool.setuptools.packages.find]
+where = ["stitch_schemata/data"]
+
+[tool.setuptools.package-data]
+mypkg = ["*"]
