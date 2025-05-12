@@ -88,3 +88,23 @@ class Config:
     Manual given hints for finding tiles. A map from basename of scanned images to the centers of the top and bottom 
     tiles. 
     """
+
+    ocr: bool
+    """
+    Whether to add OCR to the generated PDF. 
+    """
+
+    ocr_psm: str
+    """
+    The page segmentation mode used for OCR.    
+    """
+
+    ocr_language: str
+    """
+    The language(s) used for OCR.
+    """
+
+    ocr_confidence_min: float
+    """
+    The minimum confidence level of OCR for a piece of recognized text to be included in the OCR layer.
+    """

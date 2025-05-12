@@ -90,7 +90,7 @@ class TileExtractor:
         kernel_size = (math.ceil(self._config.tile_kernel_fraction * self._config.tile_width) // 2 * 2 + 1,
                        math.ceil(self._config.tile_kernel_fraction * self._config.tile_height) // 2 * 2 + 1)
 
-        width, height = self._grayscale_image.size()
+        width, height = self._grayscale_image.size
         y_lt = int(self._tile_hint[0][1])
         x_lt = int(self._tile_hint[0][0])
         x_rb = x_lt + int(self._config.tile_width)
@@ -113,7 +113,7 @@ class TileExtractor:
         kernel_size = (math.ceil(self._config.tile_kernel_fraction * self._config.tile_width) // 2 * 2 + 1,
                        math.ceil(self._config.tile_kernel_fraction * self._config.tile_height) // 2 * 2 + 1)
 
-        width, height = self._grayscale_image.size()
+        width, height = self._grayscale_image.size
         y_lt = int(self._tile_hint[1][1])
         x_lt = int(self._tile_hint[1][0])
         x_rb = x_lt + int(self._config.tile_width)
@@ -133,7 +133,7 @@ class TileExtractor:
         """
         Extracts the top and bottom tiles from a scanned page automatically
         """
-        width, height = self._grayscale_image.size()
+        width, height = self._grayscale_image.size
 
         start_x = self._config.margin
         stop_x = min(int(self._config.overlap_min * width - self._config.tile_width),

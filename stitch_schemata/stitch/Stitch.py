@@ -6,11 +6,14 @@ from typing import List
 import cv2
 import img2pdf
 import numpy as np
+import pikepdf
 import PIL
 from cleo.ui.table import Table
 from PIL import Image as PilImage
 
 from stitch_schemata.io.StitchSchemataIO import StitchSchemataIO
+from stitch_schemata.ocr.Config import Config as OcrConfig
+from stitch_schemata.ocr.Ocr import Ocr
 from stitch_schemata.stitch.Config import Config
 from stitch_schemata.stitch.Image import Image
 from stitch_schemata.stitch.OrientationDetector import OrientationDetector
@@ -70,6 +73,11 @@ class Stitch:
         The stitched image.
         """
 
+        self._ocr_pdf: pikepdf.Pdf | None = None
+        """
+        The PDF page with hidden OCR text.
+        """
+
     # ------------------------------------------------------------------------------------------------------------------
     def stitch(self) -> None:
         """
@@ -80,6 +88,7 @@ class Stitch:
         self._stitch_images()
         self._crop_stitched_image()
         self._debug_mark_stitches()
+        self._ocr()
         self._save_stitched_image()
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -269,16 +278,19 @@ class Stitch:
         """
         Saves the stitched image.
         """
+        if str(self._config.output_path).lower().endswith('.pdf') and self._config.ocr:
+            return
+
         self._io.text('')
         self._io.title('Saving Image')
 
-        if re.match(r'.*\.png$', str(self._config.output_path), re.IGNORECASE):
+        if str(self._config.output_path).lower().endswith('.png'):
             self._stitched_image.write(self._config.output_path, [cv2.IMWRITE_PNG_COMPRESSION, 9])
 
         elif re.match(r'.*\.je?pg$', str(self._config.output_path), re.IGNORECASE):
             self._stitched_image.write(self._config.output_path, [cv2.IMWRITE_JPEG_QUALITY, self._config.quality])
 
-        elif re.match(r'.*\.pdf$', str(self._config.output_path), re.IGNORECASE):
+        elif str(self._config.output_path).lower().endswith('.pdf'):
             PIL.Image.MAX_IMAGE_PIXELS = self._stitched_image.width * self._stitched_image.height
 
             if self._config.quality == 100:
@@ -287,6 +299,7 @@ class Stitch:
             else:
                 temp_filename = self._config.tmp_path / 'stitched.jpg'
                 self._stitched_image.write(temp_filename, [cv2.IMWRITE_JPEG_QUALITY, self._config.quality])
+
             with open(str(self._config.output_path), 'wb') as handle:
                 dpi = self._config.dpi
                 handle.write(img2pdf.convert(temp_filename,
@@ -442,5 +455,24 @@ class Stitch:
             cv2.rectangle(overlay, start, end, marker_color, thickness=1)
 
         self._stitched_image = Image(cv2.addWeighted(overlay, alpha, data, 1.0 - alpha, 0.0))
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def _ocr(self) -> None:
+        """
+        Adds OCR to the stitched image.
+        """
+        if not self._config.ocr or not str(self._config.output_path).lower().endswith('.pdf'):
+            return
+
+        config = OcrConfig(dpi=self._config.dpi,
+                           tmp_path=self._config.tmp_path,
+                           input_path=None,
+                           output_path=self._config.output_path,
+                           quality=self._config.quality,
+                           ocr_psm=self._config.ocr_psm,
+                           ocr_language=self._config.ocr_language,
+                           ocr_confidence_min=self._config.ocr_confidence_min)
+        ocr = Ocr(self._io, config, self._stitched_image)
+        self._ocr_pdf = ocr.ocr()
 
 # ----------------------------------------------------------------------------------------------------------------------

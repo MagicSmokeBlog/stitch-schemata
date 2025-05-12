@@ -1,4 +1,3 @@
-import os
 import re
 import tempfile
 from pathlib import Path
@@ -79,7 +78,23 @@ class StitchSchemataCommand(Command):
                option(long_name='tile-hint',
                       description='The centers of the top and bottom tiles of a scanned image (basename:x,y;x,y).',
                       flag=False,
-                      multiple=True)]
+                      multiple=True),
+               option(long_name='ocr',
+                      description='Whether to add OCR to the stitched image when saved as pdf.',
+                      default='1',
+                      flag=False),
+               option(long_name='ocr-psm',
+                      description='The page segmentation mode used for OCR.',
+                      default='sparse_text',
+                      flag=False),
+               option(long_name='ocr-language',
+                      description='The language(s) used for OCR.',
+                      default='deu+eng+fra+nld',
+                      flag=False),
+               option(long_name='ocr-confidence-min',
+                      description='The minimum confidence level of OCR for a piece of recognized text to be included in the OCR layer.',
+                      default='60.0',
+                      flag=False)]
     arguments = [argument(name='pages', description='The scanned circuit schema pages.', optional=False, multiple=True)]
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -88,7 +103,7 @@ class StitchSchemataCommand(Command):
         Executes the stitch command.
         """
         io = StitchSchemataIO(self._io.input, self._io.output, self._io.error_output)
-        tmp = tempfile.TemporaryDirectory(prefix='stitch-schemata-', dir=os.getcwd(), delete=not io.is_debug())
+        tmp = tempfile.TemporaryDirectory(prefix='stitch-schemata-', dir=Path.cwd(), delete=not io.is_debug())
         config = self._create_config(Path(tmp.name))
 
         stitch = Stitch(io, config, [Path(path) for path in self.argument('pages')])
@@ -105,6 +120,11 @@ class StitchSchemataCommand(Command):
 
         :param tmp_path: The path to the temp folder.
         """
+        tmp_path = tmp_path.resolve()
+        cwd = Path.cwd().resolve()
+        if tmp_path.is_relative_to(cwd.resolve()):
+            tmp_path = tmp_path.relative_to(cwd)
+
         return Config(margin=int(self.option('margin')),
                       overlap_min=float(self.option('overlap-min')),
                       vertical_offset_max=int(self.option('vertical-offset-max')),
@@ -116,11 +136,15 @@ class StitchSchemataCommand(Command):
                       tile_iterations_max=int(self.option('tile-iterations-max')),
                       tile_kernel_fraction=float(self.option('tile-kernel-fraction')),
                       dpi=int(self.option('dpi')),
-                      tmp_path=tmp_path.absolute(),
+                      tmp_path=tmp_path,
                       output_path=Path(self.option('output')),
                       crop=self.option('crop') == '1',
                       quality=int(self.option('quality')),
-                      tile_hints=self._extract_tile_hints())
+                      tile_hints=self._extract_tile_hints(),
+                      ocr=self.option('ocr') == '1',
+                      ocr_psm=self.option('ocr-psm'),
+                      ocr_language=self.option('ocr-language'),
+                      ocr_confidence_min=float(self.option('ocr-confidence-min')))
 
     # ------------------------------------------------------------------------------------------------------------------
     def _extract_tile_hints(self) -> Dict[str, Tuple[Tuple[int, int], Tuple[int, int]]]:

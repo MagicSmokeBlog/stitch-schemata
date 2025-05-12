@@ -33,7 +33,7 @@ class OrientationDetector:
                                       threshold=100,
                                       minLineLength=100,
                                       maxLineGap=25)
-        length_min = 0.1 * max(self._grayscale_image.size())
+        length_min = 0.1 * max(self._grayscale_image.size)
         angles = []
         if hough_lines is not None:
             for hough_line in hough_lines:
