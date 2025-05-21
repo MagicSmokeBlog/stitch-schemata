@@ -1,7 +1,7 @@
 import math
 import re
 from pathlib import Path
-from typing import List
+from typing import Any, List, Tuple
 
 import cv2
 import img2pdf
@@ -18,6 +18,7 @@ from stitch_schemata.stitch.Config import Config
 from stitch_schemata.stitch.Image import Image
 from stitch_schemata.stitch.OrientationDetector import OrientationDetector
 from stitch_schemata.stitch.ScanMetadata import ScanMetadata
+from stitch_schemata.stitch.Side import Side
 from stitch_schemata.stitch.StitchError import StitchError
 from stitch_schemata.stitch.Tile import Tile
 from stitch_schemata.stitch.TileExtractor import TileExtractor
@@ -27,6 +28,10 @@ from stitch_schemata.stitch.TileFinder import TileFinder
 class Stitch:
     """
     Class for stitching scanned images.
+    """
+    _debug_seq: int = 0
+    """
+    Sequence number for saving images in debug mode.
     """
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -156,6 +161,43 @@ class Stitch:
 
         :param index: The index of the scanned image to stitch.
         """
+        try:
+            return self._pre_stitch_image_helper(index,
+                                                 index,
+                                                 index - 1,
+                                                 Side.LEFT,
+                                                 1,
+                                                 self._config.tile_hints.get(self._paths[index].name))
+        except StitchError as error:
+            self._io.log_verbose(str(error))
+            return self._pre_stitch_image_helper(index,
+                                                 index - 1,
+                                                 index,
+                                                 Side.RIGHT,
+                                                 -1,
+                                                 None)
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def _pre_stitch_image_helper(self,
+                                 index: int,
+                                 index_extract: int,
+                                 index_matched: int,
+                                 side: Side,
+                                 sign: int,
+                                 tile_hints: Tuple[Tuple[int, int], Tuple[int, int]] | None) -> ScanMetadata:
+        """
+        Collects metadata for stitching a scanned image.
+
+        :param index: The index of the scanned image to stitch.
+        :param index_extract: The index of the image of which tiles must be extracted.
+        :param index_matched: The index of the image of which tiles must be matched.
+        :param side: The side of the image at which tile must be extracted.
+        :param sign: The sign for involved match from right to left vs left to right.
+        :param tile_hints: The tile hints.
+        """
+        self._io.log_verbose(f'Extracting tiles from image {self._paths[index_extract]} and matching in image '
+                             f'{self._paths[index_matched]}.')
+
         angle = 0.0
         angle_delta = 0.0
         tile_top = None
@@ -171,30 +213,33 @@ class Stitch:
 
             extractor = TileExtractor(self._io,
                                       self._config,
-                                      self._paths[index],
-                                      self._grayscale_images[index],
-                                      self._config.tile_hints.get(self._paths[index].name))
-            tile_top, tile_bottom = extractor.extract_tiles()
+                                      self._paths[index_extract],
+                                      side,
+                                      self._grayscale_images[index_extract],
+                                      tile_hints)
+            tile_top, tile_bottom, area = extractor.extract_tiles()
 
-            finder = TileFinder(self._io, self._config, self._grayscale_images[index - 1])
+            finder = TileFinder(self._io, self._config, self._grayscale_images[index_matched])
             tile_top_match = finder.find_tile(tile_top)
             tile_bottom_match = finder.find_tile(tile_bottom)
 
             if self._io.is_debug():
-                self._debug_save_page_extract(index, iteration, tile_top, tile_bottom)
-                self._debug_save_page_matched(index, iteration, tile_top, tile_bottom, tile_top_match,
-                                              tile_bottom_match)
+                self._debug_save_page_extract(iteration,
+                                              index_extract, tile_top, tile_bottom, area)
+                self._debug_save_page_matched(iteration,
+                                              index_extract, tile_top, tile_bottom,
+                                              index_matched, tile_top_match, tile_bottom_match)
 
             if tile_top_match.match < self._config.tile_match_min:
-                raise StitchError(f'Unable to find top tile from image {self._paths[index]} '
-                                  f'in image {self._paths[index - 1]}.')
+                raise StitchError(f'Unable to find top tile from image {self._paths[index_extract]} '
+                                  f'in image {self._paths[index_matched]}.')
             if tile_bottom_match.match < self._config.tile_match_min:
-                raise StitchError(f'Unable to find bottom tile from image {self._paths[index]} '
-                                  f'in image {self._paths[index - 1]}.')
+                raise StitchError(f'Unable to find bottom tile from image {self._paths[index_extract]} '
+                                  f'in image {self._paths[index_matched]}.')
 
             angle_delta = math.atan2(tile_bottom_match.y - tile_top_match.y, tile_bottom_match.x - tile_top_match.x) - \
                           math.atan2(tile_bottom.y - tile_top.y, tile_bottom.x - tile_top.x)
-            angle_delta = math.degrees(angle_delta)
+            angle_delta = math.degrees(sign * angle_delta)
 
             if not self._original_images[index].rotation_has_effect(angle_delta):
                 break
@@ -203,8 +248,8 @@ class Stitch:
 
         if tile_top and tile_top_match:
             return ScanMetadata(rotate=angle,
-                                translate_x=tile_top_match.x - tile_top.x,
-                                translate_y=tile_top_match.y - tile_top.y,
+                                translate_x=sign * (tile_top_match.x - tile_top.x),
+                                translate_y=sign * (tile_top_match.y - tile_top.y),
                                 width=self._grayscale_images[index].width,
                                 height=self._grayscale_images[index].height)
 
@@ -332,12 +377,17 @@ class Stitch:
         table.render()
 
     # ------------------------------------------------------------------------------------------------------------------
-    def _debug_save_page_extract(self, index: int, iteration: int, tile_top: Tile, tile_bottom: Tile) -> None:
+    def _debug_save_page_extract(self,
+                                 iteration: int,
+                                 index_extract: int,
+                                 tile_top: Tile,
+                                 tile_bottom: Tile,
+                                 area: Any) -> None:
         """
         Saves a scanned pages with extracted tiles for debugging purposes.
 
-        :param index: The index of the page.
         :param iteration: The iteration of fining the titles.
+        :param index_extract: The index of the page.
         :param tile_top: The top tile.
         :param tile_bottom: The bottom tile.
         """
@@ -345,14 +395,12 @@ class Stitch:
         area_color = (0, 255, 0)
         width = 2
 
-        path = self._config.tmp_path / f'page-{index}-iteration-{iteration}-page{index}.png'
-        image = self._grayscale_images[index].data.copy()
-        area = ((self._config.margin, self._config.margin),
-                (int(self._config.overlap_min * self._grayscale_images[index].width - 1),
-                 self._grayscale_images[index].height - self._config.margin - 1))
+        path = self._config.tmp_path / f'{self._debug_seq_value():02d}-page-{index_extract}-iteration-{iteration}-page{index_extract}.png'
+        image = self._grayscale_images[index_extract].data.copy()
 
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
-        cv2.rectangle(image, area[0], area[1], area_color, width)
+        if area is not None:
+            cv2.rectangle(image, area[0], area[1], area_color, width)
         cv2.rectangle(image,
                       (tile_top.x, tile_top.y),
                       (tile_top.x + tile_top.image.width - 1,
@@ -369,17 +417,18 @@ class Stitch:
 
     # ------------------------------------------------------------------------------------------------------------------
     def _debug_save_page_matched(self,
-                                 index: int,
                                  iteration: int,
+                                 index_extract: int,
                                  tile_top: Tile,
                                  tile_bottom: Tile,
+                                 index_matched: int,
                                  tile_top_match: Tile,
                                  tile_bottom_match: Tile) -> None:
         """
         Saves scanned page with matched tile for debugging purposes.
 
-        :param index: The index of the page.
         :param iteration: The iteration of fining the titles.
+        :param index_extract: The index of the page.
         :param tile_top: The top tile.
         :param tile_bottom: The bottom tile.
         :param tile_top_match: The top matched tile.
@@ -389,15 +438,15 @@ class Stitch:
         area_color = (0, 255, 0)
         width = 2
 
-        path = self._config.tmp_path / f'page-{index}-iteration-{iteration}-page{index - 1}.png'
-        image = self._grayscale_images[index - 1].data.copy()
+        path = self._config.tmp_path / f'{self._debug_seq_value():02d}-page-{index_extract}-iteration-{iteration}-page{index_matched}.png'
+        image = self._grayscale_images[index_matched].data.copy()
         areas = [((0, max(0, tile_top.y - self._config.vertical_offset_max)),
-                  (self._grayscale_images[index - 1].width - 1,
-                   min(self._grayscale_images[index - 1].height - 1,
+                  (self._grayscale_images[index_matched].width - 1,
+                   min(self._grayscale_images[index_matched].height - 1,
                        tile_top.y + tile_top.image.height + self._config.vertical_offset_max - 1))),
                  ((0, max(0, tile_bottom.y - self._config.vertical_offset_max)),
-                  (self._grayscale_images[index - 1].width - 1,
-                   min(self._grayscale_images[index - 1].height - 1,
+                  (self._grayscale_images[index_matched].width - 1,
+                   min(self._grayscale_images[index_matched].height - 1,
                        tile_bottom.y + tile_bottom.image.height + self._config.vertical_offset_max - 1)))]
 
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
@@ -431,6 +480,15 @@ class Stitch:
             path = Path(__file__).resolve().parent.parent / 'data/sRGB2014.icc'
 
         return str(path)
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def _debug_seq_value(self) -> int:
+        """
+        """
+        value = self._debug_seq
+        self._debug_seq += 1
+
+        return value
 
     # ------------------------------------------------------------------------------------------------------------------
     def _debug_mark_stitches(self) -> None:

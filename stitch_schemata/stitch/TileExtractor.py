@@ -1,12 +1,13 @@
 import math
 from pathlib import Path
-from typing import Tuple
+from typing import Any, Tuple
 
 import numpy as np
 
 from stitch_schemata.io.StitchSchemataIO import StitchSchemataIO
 from stitch_schemata.stitch.Config import Config
 from stitch_schemata.stitch.Image import Image
+from stitch_schemata.stitch.Side import Side
 from stitch_schemata.stitch.StitchError import StitchError
 from stitch_schemata.stitch.Tile import Tile
 
@@ -21,6 +22,7 @@ class TileExtractor:
                  io: StitchSchemataIO,
                  config: Config,
                  path: Path,
+                 side: Side,
                  grayscale_image: Image,
                  tile_hint: Tuple[Tuple[int, int], Tuple[int, int]] | None = None):
         """
@@ -29,6 +31,7 @@ class TileExtractor:
         :param io:The Output decorator.
         :param config: The configuration.
         :param path: The path to the original scanned page.
+        :param side: The side of the page where to look for tiles.
         :param grayscale_image: The grayscale image of the scanned page.
         :param tile_hint: The tile hint for the scanned page.
         """
@@ -47,6 +50,11 @@ class TileExtractor:
         The path to the original scanned page.
         """
 
+        self._side: Side = side
+        """
+        The side of the page where to look for tiles.
+        """
+
         self._grayscale_image: Image = grayscale_image
         """
         The grayscale image of the scanned page.
@@ -58,29 +66,29 @@ class TileExtractor:
         """
 
     # ------------------------------------------------------------------------------------------------------------------
-    def extract_tiles(self) -> Tuple[Tile, Tile]:
+    def extract_tiles(self) -> Tuple[Tile, Tile, Any]:
         """
         Extracts the top and bottom tiles in a scanned page.
         """
         if self._tile_hint is None:
-            tile_top, tile_bottom = self._extract_tiles_auto()
+            tile_top, tile_bottom, area = self._extract_tiles_auto()
         else:
-            tile_top, tile_bottom = self._extract_tiles_manual()
+            tile_top, tile_bottom, area = self._extract_tiles_manual()
 
         self._io.log_verbose(f'Top tile: ({tile_top.x},{tile_top.y}), # shapes: {tile_top.shapes}.')
         self._io.log_verbose(f'Bottom tile: ({tile_bottom.x},{tile_bottom.y}), # shapes: {tile_bottom.shapes}.')
 
-        return tile_top, tile_bottom
+        return tile_top, tile_bottom, area
 
     # ------------------------------------------------------------------------------------------------------------------
-    def _extract_tiles_manual(self) -> Tuple[Tile, Tile]:
+    def _extract_tiles_manual(self) -> Tuple[Tile, Tile, Any]:
         """
         Extracts the top and bottom tiles in a scanned page give a tile hint.
         """
         tile_top = self._extract_tile_manual_top()
         tile_bottom = self._extract_tile_manual_bottom()
 
-        return tile_top, tile_bottom
+        return tile_top, tile_bottom, None
 
     # ------------------------------------------------------------------------------------------------------------------
     def _extract_tile_manual_top(self) -> Tile:
@@ -129,15 +137,22 @@ class TileExtractor:
         return Tile(x=x_lt, y=y_lt, match=None, shapes=tile.number_of_shapes(kernel_size), image=tile)
 
     # ------------------------------------------------------------------------------------------------------------------
-    def _extract_tiles_auto(self) -> Tuple[Tile, Tile]:
+    def _extract_tiles_auto(self) -> Tuple[Tile, Tile, Any]:
         """
         Extracts the top and bottom tiles from a scanned page automatically
         """
         width, height = self._grayscale_image.size
 
-        start_x = self._config.margin
-        stop_x = min(int(self._config.overlap_min * width - self._config.tile_width),
-                     width - self._config.tile_width - self._config.margin)
+        if self._side == Side.LEFT:
+            start_x = self._config.margin
+            stop_x = min(int(self._config.overlap_min * width - self._config.tile_width),
+                         width - self._config.tile_width - self._config.margin)
+        elif self._side == Side.RIGHT:
+            start_x = min(int(width * (1 - self._config.overlap_min)),
+                          width - self._config.margin - self._config.tile_width)
+            stop_x = width - self._config.margin - self._config.tile_width
+        else:
+            raise ValueError('Side must be either left or right.')
         iter_x = int(max(1, math.ceil((stop_x - start_x) / (0.5 * self._config.tile_width)) + 1))
         step_x = 0.0 if iter_x == 1 else (stop_x - start_x) / (iter_x - 1)
 
@@ -185,8 +200,10 @@ class TileExtractor:
             raise StitchError(f'Unable to find tiles in image {self._path} with sufficient shapes.')
 
         if tile1_max.y < tile2_max.y:
-            return tile1_max, tile2_max
+            return tile1_max, tile2_max, ((start_x, start_y), (stop_x + self._config.tile_width, stop_y))
 
-        return tile2_max, tile1_max
+        return (tile2_max,
+                tile1_max,
+                ((start_x, start_y), (stop_x + self._config.tile_width, stop_y)))
 
 # ----------------------------------------------------------------------------------------------------------------------
