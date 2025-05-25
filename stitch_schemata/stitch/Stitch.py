@@ -14,6 +14,7 @@ from PIL import Image as PilImage
 from stitch_schemata.io.StitchSchemataIO import StitchSchemataIO
 from stitch_schemata.ocr.Config import Config as OcrConfig
 from stitch_schemata.ocr.Ocr import Ocr
+from stitch_schemata.stitch import debug_seq_value
 from stitch_schemata.stitch.Config import Config
 from stitch_schemata.stitch.Image import Image
 from stitch_schemata.stitch.OrientationDetector import OrientationDetector
@@ -28,10 +29,6 @@ from stitch_schemata.stitch.TileFinder import TileFinder
 class Stitch:
     """
     Class for stitching scanned images.
-    """
-    _debug_seq: int = 0
-    """
-    Sequence number for saving images in debug mode.
     """
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -125,7 +122,7 @@ class Stitch:
         """
         Finds the rotation of the first scanned image.
         """
-        detector = OrientationDetector(self._grayscale_images[0])
+        detector = OrientationDetector(self._io, self._config, self._paths[0], self._grayscale_images[0])
         angle = detector.detect_orientation()
 
         if angle is None:
@@ -205,6 +202,8 @@ class Stitch:
         for iteration in range(self._config.tile_iterations_max):
             angle -= angle_delta
 
+            self._io.log_verbose(f'Rotation {angle}.')
+
             if angle > self._config.rotation_max:
                 raise StitchError(f'Found rotation offset {angle:.4f} of image <fso>{self._paths[index]}</fso> '
                                   f'exceeds maximum rotation angle of {self._config.rotation_max}.')
@@ -243,8 +242,6 @@ class Stitch:
 
             if not self._original_images[index].rotation_has_effect(angle_delta):
                 break
-
-            self._io.log_verbose(f'Rotation {angle}.')
 
         if tile_top and tile_top_match:
             return ScanMetadata(rotate=angle,
@@ -395,7 +392,7 @@ class Stitch:
         area_color = (0, 255, 0)
         width = 2
 
-        path = self._config.tmp_path / f'{self._debug_seq_value():02d}-page-{index_extract}-iteration-{iteration}-page{index_extract}.png'
+        path = self._config.tmp_path / f'{debug_seq_value():02d}-page-{index_extract}-iteration-{iteration}-page{index_extract}.png'
         image = self._grayscale_images[index_extract].data.copy()
 
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
@@ -438,7 +435,7 @@ class Stitch:
         area_color = (0, 255, 0)
         width = 2
 
-        path = self._config.tmp_path / f'{self._debug_seq_value():02d}-page-{index_extract}-iteration-{iteration}-page{index_matched}.png'
+        path = self._config.tmp_path / f'{debug_seq_value():02d}-page-{index_extract}-iteration-{iteration}-page{index_matched}.png'
         image = self._grayscale_images[index_matched].data.copy()
         areas = [((0, max(0, tile_top.y - self._config.vertical_offset_max)),
                   (self._grayscale_images[index_matched].width - 1,
@@ -480,15 +477,6 @@ class Stitch:
             path = Path(__file__).resolve().parent.parent / 'data/sRGB2014.icc'
 
         return str(path)
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def _debug_seq_value(self) -> int:
-        """
-        """
-        value = self._debug_seq
-        self._debug_seq += 1
-
-        return value
 
     # ------------------------------------------------------------------------------------------------------------------
     def _debug_mark_stitches(self) -> None:

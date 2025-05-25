@@ -200,10 +200,10 @@ class TileExtractor:
             raise StitchError(f'Unable to find tiles in image {self._path} with sufficient shapes.')
 
         if tile1_max.y < tile2_max.y:
-            return tile1_max, tile2_max, ((start_x, start_y), (stop_x + self._config.tile_width, stop_y))
+            return tile1_max, tile2_max, ((start_x, start_y), (stop_x + self._config.tile_width - 1, stop_y))
 
         return (tile2_max,
                 tile1_max,
-                ((start_x, start_y), (stop_x + self._config.tile_width, stop_y)))
+                ((start_x, start_y), (stop_x + self._config.tile_width - 1, stop_y)))
 
 # ----------------------------------------------------------------------------------------------------------------------
