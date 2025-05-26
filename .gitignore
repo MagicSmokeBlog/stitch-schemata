@@ -3,6 +3,7 @@
 /.idea/
 /.venv/
 /bin/phing
+/bin/yaml-lint
 /composer.lock
 /dist/
 /poetry.lock

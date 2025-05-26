@@ -16,9 +16,9 @@ class StitchTest(unittest.TestCase):
     """
 
     # ------------------------------------------------------------------------------------------------------------------
-    def test_stitch_no_rotation(self):
+    def test_stitch_without_rotation(self):
         """
-        The unit test for stitch images.
+        Test without rotation.
         """
         dpi = 600
         inch = 25.4
@@ -80,7 +80,7 @@ class StitchTest(unittest.TestCase):
     # ------------------------------------------------------------------------------------------------------------------
     def test_stitch_with_rotation1(self):
         """
-        The unit test for stitch images.
+        Test with rotation.
         """
         dpi = 600
         inch = 25.4

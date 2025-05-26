@@ -1,7 +1,7 @@
 [run]
 branch = True
 data_file = .coverage
-source = pystratum_cli
+source = stitch_schemata
 omit = test/*
 
 [report]
