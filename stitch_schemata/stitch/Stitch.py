@@ -1,5 +1,6 @@
 import math
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import Any, List, Tuple
 
@@ -232,8 +233,6 @@ class Stitch:
                                                      area)
                 self._debug_save_page_phase1_matched(index,
                                                      index_matched,
-                                                     tile_top,
-                                                     tile_bottom,
                                                      tile_top_match,
                                                      tile_bottom_match)
 
@@ -467,6 +466,8 @@ class Stitch:
             with open(str(self._config.output_path), 'wb') as handle:
                 dpi = self._config.dpi
                 handle.write(img2pdf.convert(temp_filename,
+                                             creationdate=datetime.fromisoformat('2000-01-01T00:00:00'),
+                                             moddate=datetime.fromisoformat('2000-01-01T00:00:00'),                                             nodate=True,
                                              pdfa=self._extract_icc_profile(),
                                              layout_fun=img2pdf.get_fixed_dpi_layout_fun((dpi, dpi))))
         else:
@@ -514,7 +515,7 @@ class Stitch:
         area_color = (0, 255, 0)
         width = 2
 
-        path = self._config.tmp_path / f'{debug_seq_value():02d}-page-{index}-page{index_extract}-extract.png'
+        path = self._config.tmp_path / f'{debug_seq_value():03d}-page{index:02d}-page{index_extract:02d}-extract.png'
         image = self._grayscale_images[index_extract].data.copy()
 
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
@@ -538,8 +539,6 @@ class Stitch:
     def _debug_save_page_phase1_matched(self,
                                         index: int,
                                         index_matched: int,
-                                        tile_top: Tile,
-                                        tile_bottom: Tile,
                                         tile_top_match: Tile,
                                         tile_bottom_match: Tile) -> None:
         """
@@ -547,8 +546,6 @@ class Stitch:
 
         :param index: The index of the scanned image to stitch.
         :param index_matched: The index of the image of which tiles must be matched.
-        :param tile_top: The top tile.
-        :param tile_bottom: The bottom tile.
         :param tile_top_match: The top matched tile.
         :param tile_bottom_match: The bottom matched tile.
         """
@@ -556,7 +553,7 @@ class Stitch:
         area_color = (0, 255, 0)
         width = 2
 
-        path = self._config.tmp_path / f'{debug_seq_value():02d}-page-{index}-page-{index_matched}-matched.png'
+        path = self._config.tmp_path / f'{debug_seq_value():03d}-page{index:02d}-page{index_matched:02d}-matched.png'
         image = self._grayscale_images[index_matched].data.copy()
 
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
@@ -586,7 +583,7 @@ class Stitch:
         area_color = (0, 255, 0)
         width = 2
 
-        path = self._config.tmp_path / f'{debug_seq_value():02d}-page-{index}-page-{index_extract}-extract.png'
+        path = self._config.tmp_path / f'{debug_seq_value():03d}-page{index:02d}-page{index_extract:02d}-extract.png'
         image = self._grayscale_images[index_extract].data.copy()
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
         cv2.rectangle(image,
@@ -615,7 +612,7 @@ class Stitch:
         area_color = (0, 255, 0)
         width = 2
 
-        path = self._config.tmp_path / f'{debug_seq_value():02d}-page-{index}-page-{index_matched}-matched.png'
+        path = self._config.tmp_path / f'{debug_seq_value():03d}-page{index:02d}-page{index_matched:02d}-matched.png'
         image = self._grayscale_images[index_matched].data.copy()
         image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
         cv2.rectangle(image, tile_match.area[0], tile_match.area[1], area_color, width)
