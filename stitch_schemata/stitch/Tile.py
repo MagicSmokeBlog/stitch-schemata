@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Tuple
 
 from stitch_schemata.stitch.Image import Image
 
@@ -33,6 +34,11 @@ class Tile:
     image: Image
     """
     The tile image.
+    """
+
+    area: Tuple[Tuple[int, int], Tuple[int, int]] | None = None
+    """
+    The search area of the tile.
     """
 
 # ----------------------------------------------------------------------------------------------------------------------

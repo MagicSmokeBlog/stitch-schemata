@@ -59,6 +59,23 @@ class Image:
         return Image(data)
 
     # ------------------------------------------------------------------------------------------------------------------
+    @staticmethod
+    def empty_color_image(width: int, height: int, color: Tuple[int, int, int] | None = None):
+        """
+        Creates an empty color image.
+
+        :param width: The width of the image.
+        :param height: The height of the image.
+        :param color: The color of the image.
+        """
+        if color is None:
+            color = (255, 255, 255)
+        white = np.array(color, dtype=np.uint8)
+        data = np.full((height, width, 3), fill_value=white, dtype=np.uint8)
+
+        return Image(data)
+
+    # ------------------------------------------------------------------------------------------------------------------
     def write(self, path: Path, params: Any = None) -> None:
         """
         Writes the image to the given path.
@@ -89,6 +106,30 @@ class Image:
         data = self._crop_around_center(data, *self._largest_rotated_rect(width, height, math.radians(angle)))
 
         return Image(data)
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def sub_image(self, x: int, y: int, width: int, height: int):
+        """
+        Returns a sub-image of this image.
+
+        :param x: The x-coordinate of the top-left corner of the sub-image.
+        :param y: The y-coordinate of the top-left corner of the sub-image.
+        :param width: The width of the sub-image.
+        :param height: The height of the sub-image.
+        """
+        return Image(data=self.data[y:y + height, x:x + width])
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def match_template(self, template) -> Tuple[int, int, float]:
+        """
+        Finds a template in this image.
+
+        :param template: The template.
+        """
+        res = cv2.matchTemplate(self._data, template._data, cv2.TM_CCOEFF_NORMED)
+        _, match, _, location = cv2.minMaxLoc(res)
+
+        return location[0], location[1], match
 
     # ------------------------------------------------------------------------------------------------------------------
     def rotate90(self, rotate_code: int):
