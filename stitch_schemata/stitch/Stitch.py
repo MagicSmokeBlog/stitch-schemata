@@ -1,6 +1,5 @@
 import math
 import re
-from datetime import datetime
 from pathlib import Path
 from typing import Any, List, Tuple
 
@@ -294,18 +293,25 @@ class Stitch:
 
         def fun(x: np.array) -> float:
             self._grayscale_images[index] = self._original_images[index].grayscale().rotate(float(x[0]))
-            tile, tile_match = self._pre_stitch_image_phase2_helper_helper(index,
-                                                                           index_extract,
-                                                                           index_matched,
-                                                                           sign,
-                                                                           fun.vertical_band_x,
-                                                                           fun.vertical_band_width)
-
-            fun.vertical_band_x = max(0, tile_match.x - self._config.vertical_offset_max)
+            tile_extract, tile_match = self._pre_stitch_image_phase2_helper_helper(index,
+                                                                                   index_extract,
+                                                                                   index_matched,
+                                                                                   sign,
+                                                                                   fun.vertical_band_x,
+                                                                                   fun.vertical_band_width,
+                                                                                   False)
 
             return 1.0 - tile_match.match
 
-        fun.vertical_band_x = max(0, meta.translate_x - self._config.vertical_offset_max + self._config.margin)
+        if sign == 1:
+            fun.vertical_band_x = max(0, meta.translate_x - self._config.vertical_offset_max - self._config.margin)
+        else:
+            fun.vertical_band_x = max(0, self._grayscale_images[index_extract].width - \
+                                      self._config.margin - \
+                                      self._config.tile_width - \
+                                      self._config.vertical_offset_max - \
+                                      meta.translate_x)
+
         fun.vertical_band_width = self._config.tile_width + 2 * self._config.vertical_offset_max
 
         bounds = Bounds([-self._config.rotation_max], [self._config.rotation_max])
@@ -321,16 +327,17 @@ class Stitch:
         angle_delta = res.x[0]
         angle = angle_delta
         self._grayscale_images[index] = self._original_images[index].grayscale().rotate(angle)
-        tile, tile_match = self._pre_stitch_image_phase2_helper_helper(index,
-                                                                       index_extract,
-                                                                       index_matched,
-                                                                       sign,
-                                                                       fun.vertical_band_x,
-                                                                       fun.vertical_band_width)
+        tile_extract, tile_match = self._pre_stitch_image_phase2_helper_helper(index,
+                                                                               index_extract,
+                                                                               index_matched,
+                                                                               sign,
+                                                                               fun.vertical_band_x,
+                                                                               fun.vertical_band_width,
+                                                                               True)
 
         return ScanMetadata(rotate=angle,
-                            translate_x=sign * (tile_match.x - tile.x),
-                            translate_y=sign * (tile_match.y - tile.y),
+                            translate_x=sign * (tile_match.x - tile_extract.x),
+                            translate_y=sign * (tile_match.y - tile_extract.y),
                             width=self._grayscale_images[index].width,
                             height=self._grayscale_images[index].height)
 
@@ -340,9 +347,11 @@ class Stitch:
                                                index_extract: int,
                                                index_matched: int,
                                                sign: int,
-                                               vertical_band_x: int | None = None,
-                                               vertical_band_width: int | None = None):
+                                               vertical_band_x: int,
+                                               vertical_band_width: int,
+                                               is_final: bool):
         """
+        Helps to collect metadata for stitching a scanned image.
 
         :param index: The index of the scanned image to stitch.
         :param index_extract: The index of the image of which tiles must be extracted.
@@ -350,16 +359,20 @@ class Stitch:
         :param sign: The sign for involved match from right to left vs left to right.
         :param vertical_band_x: The left x-coordinate of on an optional vertical band where to match the tile.
         :param vertical_band_width: The width of an optional vertical band where to match the tile.
+        :param is_final: Whether this is the final phase 2 computation (used for debugging only).
         """
         margin = self._config.margin
         height = min(self._grayscale_images[index_extract].height,
-                     self._grayscale_images[index_matched].height) - 2 * margin
+                     self._grayscale_images[index_matched].height) - 2 * margin - 2 * self._config.vertical_offset_max
         if sign == 1:
             x = margin
         else:
             x = self._grayscale_images[index_extract].width - margin - self._config.tile_width
-        image_tile = self._grayscale_images[index_extract].sub_image(x, margin, self._config.tile_width, height)
-        tile_extract = Tile(x=x, y=margin, match=None, shapes=None, image=image_tile)
+        image_tile = self._grayscale_images[index_extract].sub_image(x,
+                                                                     margin + self._config.vertical_offset_max,
+                                                                     self._config.tile_width,
+                                                                     height)
+        tile_extract = Tile(x=x, y=margin + self._config.vertical_offset_max, match=None, shapes=None, image=image_tile)
         tile_finder = TileFinder(self._io,
                                  self._config,
                                  self._grayscale_images[index_matched],
@@ -367,7 +380,7 @@ class Stitch:
                                  vertical_band_width)
         tile_match = tile_finder.find_tile(tile_extract)
 
-        if self._io.is_debug():
+        if is_final and self._io.is_debug():
             self._debug_save_page_phase2_extract(index, index_extract, tile_extract)
             self._debug_save_page_phase2_matched(index, index_matched, tile_extract, tile_match)
 
@@ -466,8 +479,6 @@ class Stitch:
             with open(str(self._config.output_path), 'wb') as handle:
                 dpi = self._config.dpi
                 handle.write(img2pdf.convert(temp_filename,
-                                             creationdate=datetime.fromisoformat('2000-01-01T00:00:00'),
-                                             moddate=datetime.fromisoformat('2000-01-01T00:00:00'),                                             nodate=True,
                                              pdfa=self._extract_icc_profile(),
                                              layout_fun=img2pdf.get_fixed_dpi_layout_fun((dpi, dpi))))
         else:
@@ -533,7 +544,7 @@ class Stitch:
                        tile_bottom.y + tile_bottom.image.height - 1),
                       title_color,
                       width)
-        cv2.imwrite(str(path), image)
+        cv2.imwrite(str(path), image, [cv2.IMWRITE_PNG_COMPRESSION, 0])
 
     # ------------------------------------------------------------------------------------------------------------------
     def _debug_save_page_phase1_matched(self,
@@ -565,7 +576,7 @@ class Stitch:
                            tile_match.y + tile_match.image.height - 1),
                           title_color,
                           width)
-        cv2.imwrite(str(path), image)
+        cv2.imwrite(str(path), image, [cv2.IMWRITE_PNG_COMPRESSION, 0])
 
     # ------------------------------------------------------------------------------------------------------------------
     def _debug_save_page_phase2_extract(self,
@@ -580,7 +591,6 @@ class Stitch:
         :param tile_extract: The extracted tile.
         """
         title_color = (0, 0, 255)
-        area_color = (0, 255, 0)
         width = 2
 
         path = self._config.tmp_path / f'{debug_seq_value():03d}-page{index:02d}-page{index_extract:02d}-extract.png'
@@ -592,7 +602,7 @@ class Stitch:
                        tile_extract.y + tile_extract.image.height - 1),
                       title_color,
                       width)
-        cv2.imwrite(str(path), image)
+        cv2.imwrite(str(path), image, [cv2.IMWRITE_PNG_COMPRESSION, 0])
 
     # ------------------------------------------------------------------------------------------------------------------
     def _debug_save_page_phase2_matched(self,
@@ -622,7 +632,7 @@ class Stitch:
                        tile_match.y + tile_match.image.height - 1),
                       title_color,
                       width)
-        cv2.imwrite(str(path), image)
+        cv2.imwrite(str(path), image, [cv2.IMWRITE_PNG_COMPRESSION, 0])
 
     # ------------------------------------------------------------------------------------------------------------------
     def _extract_icc_profile(self) -> str:
