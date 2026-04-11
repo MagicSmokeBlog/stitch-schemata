@@ -215,7 +215,7 @@ class Image:
         """
         Returns a grayscale copy of this image.
         """
-        return Image(cv2.cvtColor(self._data, cv2.COLOR_BGR2GRAY))
+        return Image(cv2.cvtColor(self._data, cv2.COLOR_RGB2GRAY))
 
     # ------------------------------------------------------------------------------------------------------------------
     @property

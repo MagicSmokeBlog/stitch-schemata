@@ -474,7 +474,9 @@ class Stitch:
                 self._stitched_image.write(temp_filename, [cv2.IMWRITE_PNG_COMPRESSION, 9])
             else:
                 temp_filename = self._config.tmp_path / 'stitched.jpg'
-                self._stitched_image.write(temp_filename, [cv2.IMWRITE_JPEG_QUALITY, self._config.quality])
+                self._stitched_image.write(temp_filename, [cv2.IMWRITE_JPEG_QUALITY, self._config.quality,
+                                                           cv2.IMWRITE_JPEG_OPTIMIZE, 1,
+                                                           cv2.IMWRITE_JPEG_PROGRESSIVE, 1])
 
             with open(str(self._config.output_path), 'wb') as handle:
                 dpi = self._config.dpi
@@ -685,6 +687,7 @@ class Stitch:
                            tmp_path=self._config.tmp_path,
                            input_path=None,
                            output_path=self._config.output_path,
+                           mode=self._config.mode,
                            quality=self._config.quality,
                            ocr_psm=self._config.ocr_psm,
                            ocr_language=self._config.ocr_language,

@@ -27,6 +27,11 @@ class Config:
     The path to the PDF with OCR. 
     """
 
+    mode: str
+    """
+    The colorspace of the output. Either: 'color', 'grayscale', or 'black-gray-white'.
+    """
+
     quality: int
     """
     The quality of the stitched image when saved as jpeg or pdf. 

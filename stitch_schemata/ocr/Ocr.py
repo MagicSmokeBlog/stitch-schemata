@@ -7,9 +7,10 @@ import cv2
 import img2pdf
 import pikepdf
 import PIL
+from numpy import ndenumerate
 from pikepdf import Matrix, Name, Rectangle
 from pikepdf.canvas import Canvas, Color, Text
-from PIL import Image as PilImage
+from PIL import Image, Image as PilImage
 
 from stitch_schemata.io.StitchSchemataIO import StitchSchemataIO
 from stitch_schemata.ocr.Config import Config
@@ -84,7 +85,6 @@ class Ocr:
     def _run_tesseract(self) -> None:
         """
         Runs tesseract on the image.
-
         """
         self._io.text('')
         self._io.title('OCR')
@@ -203,12 +203,34 @@ class Ocr:
 
         PIL.Image.MAX_IMAGE_PIXELS = self._image.width * self._image.height
 
+        if self._config.mode == 'black-gray-white':
+            self._image = self._image.grayscale()
+            self._image = Image(cv2.bilateralFilter(self._image.data, 3, 64, 64))
+            for index, value in ndenumerate(self._image.data):
+                value = self._image.data[index]
+                if value <= 127:
+                    new_value = 33  # 212121
+                elif value <= 171:
+                    new_value = 127
+                else:
+                    new_value = 255
+                self._image.data[index] = new_value
+        elif self._config.mode == 'grayscale':
+            self._image = self._image.grayscale()
+            self._image = Image(cv2.bilateralFilter(self._image.data, 3, 64, 64))
+        elif self._config.mode == 'color':
+            pass
+        else:
+            raise ValueError(f"Invalid mode: '{self._config.mode}'.")
+
         if self._config.quality == 100:
             temp_filename = self._config.tmp_path / 'ocr.png'
             self._image.write(temp_filename, [cv2.IMWRITE_PNG_COMPRESSION, 9])
         else:
             temp_filename = self._config.tmp_path / 'ocr.jpg'
-            self._image.write(temp_filename, [cv2.IMWRITE_JPEG_QUALITY, self._config.quality])
+            self._image.write(temp_filename, [cv2.IMWRITE_JPEG_QUALITY, self._config.quality,
+                                              cv2.IMWRITE_JPEG_OPTIMIZE, 1,
+                                              cv2.IMWRITE_JPEG_PROGRESSIVE, 1])
 
         filename_temp_pdf = self._config.tmp_path / 'image.pdf'
         with open(str(filename_temp_pdf), 'wb') as handle:
