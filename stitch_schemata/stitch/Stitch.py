@@ -1,3 +1,4 @@
+import datetime
 import math
 import re
 from pathlib import Path
@@ -110,7 +111,7 @@ class Stitch:
 
             image = Image.read(path_src)
             self._original_images.append(image)
-            self._grayscale_images.append(image.grayscale())
+            self._grayscale_images.append(image.color_bgr2gray())
 
             if index == 0:
                 meta = self._pre_stitch_image0()
@@ -145,7 +146,7 @@ class Stitch:
                                 width=self._grayscale_images[0].width,
                                 height=self._grayscale_images[0].height)
 
-        self._grayscale_images[0] = self._original_images[0].grayscale().rotate(angle)
+        self._grayscale_images[0] = self._original_images[0].color_bgr2gray().rotate(angle)
 
         return ScanMetadata(rotate=angle,
                             translate_x=0,
@@ -210,7 +211,7 @@ class Stitch:
                 raise StitchError(f'Found rotation offset {angle:.4f} of image <fso>{self._paths[index]}</fso> '
                                   f'exceeds maximum rotation angle of {self._config.rotation_max}.')
 
-            self._grayscale_images[index] = self._original_images[index].grayscale().rotate(angle)
+            self._grayscale_images[index] = self._original_images[index].color_bgr2gray().rotate(angle)
 
             extractor = TileExtractor(self._io,
                                       self._config,
@@ -292,7 +293,7 @@ class Stitch:
                              f'<fso>{self._paths[index_matched]}</fso>.')
 
         def fun(x: np.array) -> float:
-            self._grayscale_images[index] = self._original_images[index].grayscale().rotate(float(x[0]))
+            self._grayscale_images[index] = self._original_images[index].color_bgr2gray().rotate(float(x[0]))
             tile_extract, tile_match = self._pre_stitch_image_phase2_helper_helper(index,
                                                                                    index_extract,
                                                                                    index_matched,
@@ -326,7 +327,7 @@ class Stitch:
 
         angle_delta = res.x[0]
         angle = angle_delta
-        self._grayscale_images[index] = self._original_images[index].grayscale().rotate(angle)
+        self._grayscale_images[index] = self._original_images[index].color_bgr2gray().rotate(angle)
         tile_extract, tile_match = self._pre_stitch_image_phase2_helper_helper(index,
                                                                                index_extract,
                                                                                index_matched,
@@ -411,7 +412,7 @@ class Stitch:
             total_width = offset_x + page.width
             total_height = max(total_height, offset_y + page.height)
 
-        stitch_data = np.full((total_height, total_width, 3), (255, 255, 255), np.uint8)
+        stitch_data = np.full((total_height, total_width, 3), Image.COLOR_BGR_WHITE, np.uint8)
 
         offset_x = 0
         offset_y = 0
@@ -524,14 +525,14 @@ class Stitch:
         :param tile_top: The top tile.
         :param tile_bottom: The bottom tile.
         """
-        title_color = (0, 0, 255)
+        title_color = (255, 0, 0)
         area_color = (0, 255, 0)
         width = 2
 
         path = self._config.tmp_path / f'{debug_seq_value():03d}-page{index:02d}-page{index_extract:02d}-extract.png'
         image = self._grayscale_images[index_extract].data.copy()
 
-        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+        image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
         if area is not None:
             cv2.rectangle(image, area[0], area[1], area_color, width)
         cv2.rectangle(image,
@@ -562,14 +563,14 @@ class Stitch:
         :param tile_top_match: The top matched tile.
         :param tile_bottom_match: The bottom matched tile.
         """
-        title_color = (0, 0, 255)
+        title_color = (255, 0, 0)
         area_color = (0, 255, 0)
         width = 2
 
         path = self._config.tmp_path / f'{debug_seq_value():03d}-page{index:02d}-page{index_matched:02d}-matched.png'
         image = self._grayscale_images[index_matched].data.copy()
 
-        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+        image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
         for tile_match in [tile_top_match, tile_bottom_match]:
             cv2.rectangle(image, tile_match.area[0], tile_match.area[1], area_color, width)
             cv2.rectangle(image,
@@ -592,12 +593,12 @@ class Stitch:
         :param index_extract: The index of the image of which tiles must be extracted.
         :param tile_extract: The extracted tile.
         """
-        title_color = (0, 0, 255)
+        title_color = (255, 0, 0)
         width = 2
 
         path = self._config.tmp_path / f'{debug_seq_value():03d}-page{index:02d}-page{index_extract:02d}-extract.png'
         image = self._grayscale_images[index_extract].data.copy()
-        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+        image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
         cv2.rectangle(image,
                       (tile_extract.x, tile_extract.y),
                       (tile_extract.x + tile_extract.image.width - 1,
@@ -620,13 +621,13 @@ class Stitch:
         :param tile_extract: The extracted tile.
         :param tile_match: The matched tile.
         """
-        title_color = (0, 0, 255)
+        title_color = (255, 0, 0)
         area_color = (0, 255, 0)
         width = 2
 
         path = self._config.tmp_path / f'{debug_seq_value():03d}-page{index:02d}-page{index_matched:02d}-matched.png'
         image = self._grayscale_images[index_matched].data.copy()
-        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+        image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
         cv2.rectangle(image, tile_match.area[0], tile_match.area[1], area_color, width)
         cv2.rectangle(image,
                       (tile_match.x, tile_match.y),
@@ -659,7 +660,7 @@ class Stitch:
         if not self._io.is_debug():
             return
 
-        marker_color = (0, 0, 255)
+        marker_color = (255, 0, 0)
         alpha = 0.5
         height = self._stitched_image.height
         data = self._stitched_image.data
@@ -683,16 +684,21 @@ class Stitch:
         if not self._config.ocr or not str(self._config.output_path).lower().endswith('.pdf'):
             return
 
+        timestamp = datetime.datetime.fromtimestamp(0, datetime.UTC)
+        for path in self._paths:
+            timestamp = max(timestamp, datetime.datetime.fromtimestamp(path.stat().st_mtime, datetime.UTC))
+
         config = OcrConfig(dpi=self._config.dpi,
                            tmp_path=self._config.tmp_path,
                            input_path=None,
                            output_path=self._config.output_path,
                            mode=self._config.mode,
+                           post=self._config.post,
                            quality=self._config.quality,
                            ocr_psm=self._config.ocr_psm,
                            ocr_language=self._config.ocr_language,
                            ocr_confidence_min=self._config.ocr_confidence_min)
-        ocr = Ocr(self._io, config, self._stitched_image)
+        ocr = Ocr(self._io, config, timestamp=timestamp, image=self._stitched_image)
         self._ocr_pdf = ocr.ocr()
 
 # ----------------------------------------------------------------------------------------------------------------------

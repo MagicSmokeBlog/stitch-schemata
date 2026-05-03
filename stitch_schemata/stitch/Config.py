@@ -78,6 +78,11 @@ class Config:
     The colorspace of the output. Either: 'color', 'grayscale', or 'black-gray-white'.
     """
 
+    post: str
+    """
+    The post processing.
+    """
+
     crop: bool
     """
     Whether to crop the image. Only effects to top and bottom part of the stitched image.

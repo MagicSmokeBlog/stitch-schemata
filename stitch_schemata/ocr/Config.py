@@ -32,6 +32,11 @@ class Config:
     The colorspace of the output. Either: 'color', 'grayscale', or 'black-gray-white'.
     """
 
+    post: str
+    """
+    The post processing.
+    """
+
     quality: int
     """
     The quality of the stitched image when saved as jpeg or pdf. 

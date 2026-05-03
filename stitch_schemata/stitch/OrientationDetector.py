@@ -104,7 +104,7 @@ class OrientationDetector:
         width = 2
 
         path = self._config.tmp_path / f'{debug_seq_value():03d}-page{0:02d}.png'
-        image = cv2.cvtColor(self._grayscale_image.data, cv2.COLOR_GRAY2RGB)
+        image = cv2.cvtColor(self._grayscale_image.data, cv2.COLOR_GRAY2BGR)
         for line in lines:
             x1, y1, x2, y2 = line
             cv2.rectangle(image, (x1, y1), (x2, y2), color, width)

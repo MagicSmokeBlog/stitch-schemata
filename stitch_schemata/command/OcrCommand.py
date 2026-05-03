@@ -1,3 +1,4 @@
+import datetime
 import tempfile
 from pathlib import Path
 
@@ -30,6 +31,11 @@ class OcrCommand(Command):
                       flag=False,
                       value_required=True,
                       default='color'),
+               option(long_name='post',
+                      description="Post processing",
+                      value_required=True,
+                      flag=False,
+                      default='none'),
                option(long_name='quality',
                       description='The quality of the image when saved in the PDF.',
                       default=90,
@@ -60,7 +66,9 @@ class OcrCommand(Command):
         tmp = tempfile.TemporaryDirectory(prefix='stitch-schemata-', dir=Path.cwd(), delete=not io.is_debug())
         config = self._create_config(Path(tmp.name))
 
-        ocr = Ocr(io, config)
+        ocr = Ocr(io,
+                  config,
+                  timestamp=datetime.datetime.fromtimestamp(config.input_path.stat().st_mtime, datetime.UTC))
         ocr.ocr()
 
         io.text('')
@@ -84,6 +92,7 @@ class OcrCommand(Command):
                       input_path=Path(self.option('input')),
                       output_path=Path(self.option('output')),
                       mode=str(self.option('mode')),
+                      post=self.option('post'),
                       quality=int(self.option('quality')),
                       ocr_psm=self.option('ocr-psm'),
                       ocr_language=self.option('ocr-language'),

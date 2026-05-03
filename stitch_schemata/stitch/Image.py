@@ -1,4 +1,5 @@
 import math
+import time
 from pathlib import Path
 from typing import Any, Tuple
 
@@ -10,7 +11,10 @@ class Image:
     """
     Class for images.
     """
-
+    COLOR_BGR_WHITE = np.uint8([255, 255, 255])
+    """
+    White in BGR notation.
+    """
     # ------------------------------------------------------------------------------------------------------------------
     def __init__(self, data: np.ndarray):
         """
@@ -69,11 +73,19 @@ class Image:
         :param color: The color of the image.
         """
         if color is None:
-            color = (255, 255, 255)
-        white = np.array(color, dtype=np.uint8)
-        data = np.full((height, width, 3), fill_value=white, dtype=np.uint8)
+            fill_color = Image.COLOR_BGR_WHITE
+        else:
+            fill_color = np.array(color, dtype=np.uint8)
+        data = np.full((height, width, 3), fill_value=fill_color, dtype=np.uint8)
 
         return Image(data)
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def clone(self):
+        """
+        Returns a copy of this image.
+        """
+        return Image(self._data.copy())
 
     # ------------------------------------------------------------------------------------------------------------------
     def write(self, path: Path, params: Any = None) -> None:
@@ -211,11 +223,32 @@ class Image:
         return bb_width - 2 * x, bb_height - 2 * y
 
     # ------------------------------------------------------------------------------------------------------------------
-    def grayscale(self):
+    def color_bgr2gray(self):
         """
         Returns a grayscale copy of this image.
         """
-        return Image(cv2.cvtColor(self._data, cv2.COLOR_RGB2GRAY))
+        shape = self._data.shape
+        if len(shape) == 3 and shape[2] == 3:
+            return Image(cv2.cvtColor(self._data, cv2.COLOR_BGR2GRAY))
+
+        if len(shape) == 2:
+            return Image(self._data)
+
+        raise ValueError(f'Unexpected shape: {shape}.')
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def color_gray2bgr(self):
+        """
+        Returns a color copy of this grayscale image.
+        """
+        return Image(cv2.cvtColor(self._data, cv2.COLOR_GRAY2BGR))
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def color_bgr2hsv(self):
+        """
+        Returns a copy of this image in HSV.
+        """
+        return Image(cv2.cvtColor(self._data, cv2.COLOR_BGR2HSV))
 
     # ------------------------------------------------------------------------------------------------------------------
     @property

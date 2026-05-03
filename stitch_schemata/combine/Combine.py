@@ -46,6 +46,7 @@ class Combine:
 
         pdf_combined = pikepdf.open(Path(__file__).resolve().parent.parent / 'data/empty.pdf')
         versions = [float(pdf_combined.pdf_version)]
+        timestamp = datetime.datetime.fromtimestamp(0, datetime.UTC)
 
         for path in self._paths:
             self._io.text(f'Combining <fso>{path.name}</fso>.')
@@ -62,16 +63,19 @@ class Combine:
                     new_page.Annots = pdf_combined.copy_foreign(indirect_annots)
 
             versions.append(float(pdf.pdf_version))
+            timestamp = max(timestamp,  datetime.datetime.fromtimestamp(path.stat().st_mtime, datetime.UTC))
 
         with pdf_combined.open_metadata() as meta:
             meta.mark = False
-            now = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S%z")
-            meta['xmp:CreateDate'] = now
-            meta['xmp:MetadataDate'] = now
+            formated_timestamp = timestamp.strftime("%Y-%m-%dT%H:%M:%S%z")
+            meta['dc:title'] = self._config.output_path.stem
+            meta['xmp:CreateDate'] = formated_timestamp
+            meta['xmp:ModifyDate'] = formated_timestamp
+            meta['xmp:MetadataDate'] = formated_timestamp
             meta['xmp:CreatorTool'] = 'https://github.com/MagicSmokeBlog/stitch-schemata'
 
         self._io.text('')
         self._io.text(f'Saving combined PDF document as <fso>{self._config.output_path}</fso>.')
-        pdf_combined.save(self._config.output_path, min_version=str(max(versions)))
+        pdf_combined.save(self._config.output_path, min_version=('A', 4), linearize=True, deterministic_id=True)
 
 # ----------------------------------------------------------------------------------------------------------------------
