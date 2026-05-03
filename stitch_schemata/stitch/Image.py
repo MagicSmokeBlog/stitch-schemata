@@ -1,5 +1,4 @@
 import math
-import time
 from pathlib import Path
 from typing import Any, Tuple
 
@@ -15,6 +14,7 @@ class Image:
     """
     White in BGR notation.
     """
+
     # ------------------------------------------------------------------------------------------------------------------
     def __init__(self, data: np.ndarray):
         """
@@ -188,39 +188,25 @@ class Image:
 
     # ------------------------------------------------------------------------------------------------------------------
     @staticmethod
-    def _largest_rotated_rect(width: int, height: int, angle: float):
+    def _largest_rotated_rect(width: int, height: int, angle: float) -> Tuple[int, int]:
         """
         Given a rectangle of size wxh that has been rotated by an angle (in radians), computes the width and height of
         the largest possible axis-aligned rectangle within the rotated rectangle.
 
         See https://stackoverflow.com/questions/16702966/rotate-image-and-crop-out-black-borders.
         """
-        quadrant = int(math.floor(angle / (math.pi / 2))) & 3
-        sign_alpha = angle if ((quadrant & 1) == 0) else math.pi - angle
-        alpha = (sign_alpha % math.pi + math.pi) % math.pi
+        width_is_longer = width >= height
+        side_long, side_short = (width, height) if width_is_longer else (height, width)
 
-        bb_width = width * math.cos(alpha) + height * math.sin(alpha)
-        bb_height = width * math.sin(alpha) + height * math.cos(alpha)
-
-        if width < height:
-            gamma = math.atan2(bb_width, bb_width)
+        sin_a, cos_a = abs(math.sin(angle)), abs(math.cos(angle))
+        if side_short <= 2.0 * sin_a * cos_a * side_long or abs(sin_a - cos_a) < 1e-10:
+            x = 0.5 * side_short
+            wr, hr = (x / sin_a, x / cos_a) if width_is_longer else (x / cos_a, x / sin_a)
         else:
-            gamma = math.atan2(bb_width, bb_width)
+            cos_2a = cos_a * cos_a - sin_a * sin_a
+            wr, hr = (width * cos_a - height * sin_a) / cos_2a, (height * cos_a - width * sin_a) / cos_2a
 
-        delta = math.pi - alpha - gamma
-
-        if width < height:
-            length = height
-        else:
-            length = width
-
-        d = length * math.cos(alpha)
-        a = d * math.sin(alpha) / math.sin(delta)
-
-        y = a * math.cos(gamma)
-        x = y * math.tan(gamma)
-
-        return bb_width - 2 * x, bb_height - 2 * y
+        return int(wr), int(hr)
 
     # ------------------------------------------------------------------------------------------------------------------
     def color_bgr2gray(self):
